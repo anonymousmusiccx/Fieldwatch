@@ -1,0 +1,8 @@
+{
+  "name": "Fieldwatch",
+  "description": "Tactical passive RF monitor for Wi-Fi access points and Bluetooth LE advertisements with radar, signature identification, debrief reports, and hunt tracking.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

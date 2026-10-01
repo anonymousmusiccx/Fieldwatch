@@ -10,6 +10,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -76,6 +77,7 @@ import androidx.compose.material3.Surface
 import app.fieldwatch.ui.component.FieldwatchSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -375,6 +377,11 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
             if (route != "detail" && route != "hunt") {
                 TopAppBar(
                     expandedHeight = 52.dp,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                        actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
                     title = {
                         val screenW = LocalConfiguration.current.screenWidthDp.dp
                         val actionW = if (route == "live") 56.dp else 16.dp
@@ -472,8 +479,9 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                         )
                     }
                     Surface(
-                        color = NavigationBarDefaults.containerColor,
-                        tonalElevation = NavigationBarDefaults.Elevation,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.38f)),
+                        tonalElevation = 0.dp,
                         modifier = Modifier
                             .fillMaxWidth()
                             .windowInsetsPadding(WindowInsets.navigationBars),
@@ -481,8 +489,8 @@ private fun FieldwatchShell(state: FieldwatchUi, vm: FieldwatchViewModel) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 1.dp)
-                                .height(48.dp),
+                                .padding(vertical = 2.dp)
+                                .height(50.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                         FieldwatchNavTab(
@@ -767,19 +775,19 @@ private fun RowScope.FieldwatchNavTab(
     val color = if (selected) {
         MaterialTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
     }
     Column(
         Modifier
             .weight(weight)
             .clickable(onClick = onClick)
-            .padding(horizontal = 2.dp, vertical = 1.dp),
+            .padding(horizontal = 2.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         CompositionLocalProvider(LocalContentColor provides color) {
             Box(
-                Modifier.height(22.dp),
+                Modifier.height(24.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(Modifier.onGloballyPositioned { onBounds(it.boundsInRoot()) }) {
@@ -788,7 +796,9 @@ private fun RowScope.FieldwatchNavTab(
             }
             Text(
                 label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                ),
                 color = color,
                 maxLines = 1,
                 softWrap = false,
@@ -849,7 +859,8 @@ private fun ViewPicker(
             .heightIn(max = panelMax),
         shape = RoundedCornerShape(16.dp),
         color = surfaceColor,
-        tonalElevation = 3.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+        tonalElevation = 2.dp,
         shadowElevation = 8.dp,
     ) {
         Box {

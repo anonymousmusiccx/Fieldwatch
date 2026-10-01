@@ -3,6 +3,7 @@ package app.fieldwatch.ui.screen
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -475,7 +476,8 @@ private fun OutlineGroupRow(
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = if (indent) 0.dp else 1.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = if (indent) 16.dp else 0.dp)
@@ -1126,7 +1128,12 @@ fun DeviceRow(
     Surface(
         shape = RoundedCornerShape(if (roomy) 12.dp else 8.dp),
         color = rowColor,
-        tonalElevation = 1.dp,
+        border = BorderStroke(
+            1.dp,
+            if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)
+            else MaterialTheme.colorScheme.outline.copy(alpha = 0.32f),
+        ),
+        tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onOpen(device) },
@@ -1432,6 +1439,12 @@ private fun TimelineView(
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = rowColor,
+                border = BorderStroke(
+                    1.dp,
+                    if (device.key in flashKeys) MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)
+                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.32f),
+                ),
+                tonalElevation = 0.dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onOpen(device) },

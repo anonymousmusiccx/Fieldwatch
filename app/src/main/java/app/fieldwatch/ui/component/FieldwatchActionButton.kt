@@ -3,36 +3,35 @@ package app.fieldwatch.ui.component
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 
-/** Section-tile green (surface at 1.dp). */
+/** Section surface fill. */
 @Composable
 internal fun spectreSectionFill(): Color {
-    return MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+    return MaterialTheme.colorScheme.surfaceVariant
 }
 
-/** Section-tile green, darkened. Shared by action buttons and switch tracks. */
+/** Refined dark tile fill for modern dark actions and switch tracks. */
 @Composable
 internal fun spectreTileFill(): Color {
-    return lerp(Color.Black, spectreSectionFill(), 0.78f)
+    return MaterialTheme.colorScheme.surface
 }
 
-/** Gray outline shared by action buttons and switches. */
+/** Modern hairline outline shared by action buttons and switches. */
 @Composable
 internal fun spectreTileEdge(): Color {
     val scheme = MaterialTheme.colorScheme
-    return lerp(scheme.outline, scheme.onSurfaceVariant, 0.32f)
+    return scheme.outline.copy(alpha = 0.55f)
 }
 
-/** Action button: section-tile green, darkened; gray outline, off-white label. */
+/** Action button: modern dark surface with hairline outline and crisp typography. */
 @Composable
 fun FieldwatchActionButton(
     onClick: () -> Unit,
@@ -47,6 +46,7 @@ fun FieldwatchActionButton(
     OutlinedButton(
         onClick = onClick,
         modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
         enabled = enabled,
         contentPadding = contentPadding,
         colors = ButtonDefaults.outlinedButtonColors(
@@ -55,7 +55,7 @@ fun FieldwatchActionButton(
             disabledContainerColor = fill.copy(alpha = 0.4f),
             disabledContentColor = scheme.onSurface.copy(alpha = 0.38f),
         ),
-        border = BorderStroke(1.dp, if (enabled) edge else edge.copy(alpha = 0.4f)),
+        border = BorderStroke(1.dp, if (enabled) edge else edge.copy(alpha = 0.35f)),
         content = content,
     )
 }

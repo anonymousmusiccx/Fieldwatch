@@ -1,5 +1,6 @@
 package app.fieldwatch.ui.component
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -14,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/** Grouped settings/filter block. Same surface bar as Signatures class headers. */
+/** Grouped settings/filter block with modern dark surface and hairline outline. */
 @Composable
 fun SectionCard(
     title: String,
@@ -23,9 +24,10 @@ fun SectionCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.38f)),
+        tonalElevation = 0.dp,
     ) {
         Column(
             Modifier.padding(horizontal = 14.dp, vertical = 12.dp),

@@ -180,10 +180,10 @@ fun PresenceTrack(
 }
 
 fun rssiColor(rssi: Int): Color = when {
-    rssi >= -55 -> Color(0xFF3DFF9A)
-    rssi >= -70 -> Color(0xFFFFB020)
-    rssi >= -85 -> Color(0xFFFF8A4C)
-    else -> Color(0xFFFF3D5A)
+    rssi >= -55 -> Color(0xFF10E79D)
+    rssi >= -70 -> Color(0xFFF59E0B)
+    rssi >= -85 -> Color(0xFFFB923C)
+    else -> Color(0xFFF43F5E)
 }
 
 fun RssiTrend.mark(): String = when (this) {
@@ -196,9 +196,9 @@ fun RssiTrend.mark(): String = when (this) {
 }
 
 fun RssiTrend.tint(): Color = when (this) {
-    RssiTrend.UP_FAST, RssiTrend.UP -> Color(0xFF3DFF9A)
-    RssiTrend.DOWN, RssiTrend.DOWN_FAST -> Color(0xFFFF3D5A)
-    RssiTrend.FLAT -> Color(0xFF8A93A0)
+    RssiTrend.UP_FAST, RssiTrend.UP -> Color(0xFF10E79D)
+    RssiTrend.DOWN, RssiTrend.DOWN_FAST -> Color(0xFFF43F5E)
+    RssiTrend.FLAT -> Color(0xFF94A3B8)
     RssiTrend.UNKNOWN -> Color.Transparent
 }
 

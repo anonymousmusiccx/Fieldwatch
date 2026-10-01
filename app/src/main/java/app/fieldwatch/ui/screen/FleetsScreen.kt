@@ -225,7 +225,8 @@ private fun SignatureClassHeader(
         onClick = onToggle,
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        tonalElevation = 0.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -256,9 +257,10 @@ private fun SignatureRow(fleet: Fleet, state: FieldwatchUi, vm: FieldwatchViewMo
     val liveHits = state.devices.count { fleet.id in it.fleetIds && !it.gone }
     Surface(
         onClick = { vm.editFleet(fleet) },
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.32f)),
+        tonalElevation = 0.dp,
     ) {
         Row(
             Modifier

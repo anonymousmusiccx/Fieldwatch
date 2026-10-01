@@ -1,5 +1,6 @@
 package app.fieldwatch.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -77,7 +78,8 @@ fun RadioClassBadge(
 ) {
     Surface(
         shape = CircleShape,
-        color = accent.copy(alpha = 0.18f),
+        color = accent.copy(alpha = 0.16f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.32f)),
         modifier = Modifier.size(if (compact) 26.dp else 28.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {

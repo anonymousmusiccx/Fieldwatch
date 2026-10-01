@@ -28,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import app.fieldwatch.ui.component.FieldwatchSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -96,13 +97,13 @@ fun HuntScreen(
         ?: MaterialTheme.colorScheme.primary)
         .nightIf(night)
     val cueColor = when (hunt.cue) {
-        HuntCue.VERY_CLOSE -> Color(0xFF7CFF3D).nightIf(night)
-        HuntCue.CLOSER -> Color(0xFF3DFF9A).nightIf(night)
-        HuntCue.FURTHER -> Color(0xFFFF3D5A).nightIf(night)
+        HuntCue.VERY_CLOSE -> Color(0xFF22C55E).nightIf(night)
+        HuntCue.CLOSER -> Color(0xFF10E79D).nightIf(night)
+        HuntCue.FURTHER -> Color(0xFFF43F5E).nightIf(night)
         HuntCue.SAME -> MaterialTheme.colorScheme.onSurface
         HuntCue.WAITING -> MaterialTheme.colorScheme.onSurfaceVariant
-        HuntCue.QUIET -> Color(0xFFFFB020).nightIf(night)
-        HuntCue.GONE -> Color(0xFFFF3D5A).nightIf(night)
+        HuntCue.QUIET -> Color(0xFFF59E0B).nightIf(night)
+        HuntCue.GONE -> Color(0xFFF43F5E).nightIf(night)
     }
     val now = System.currentTimeMillis()
     val heardAgo = if (hunt.lastSeen > 0L) ((now - hunt.lastSeen) / 1000L).coerceAtLeast(0L) else null
@@ -119,6 +120,12 @@ fun HuntScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
             )
         },
         bottomBar = {
