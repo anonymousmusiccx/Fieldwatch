@@ -121,6 +121,28 @@ class TacticalAudioService {
   }
 
   /**
+   * Radar target hit acoustic ping (tactical sonar/blip)
+   */
+  playRadarTargetBlip(freq = 920, vol = 0.07) {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.75, now + 0.06);
+      gain.gain.setValueAtTime(vol, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.09);
+    } catch {}
+  }
+
+  /**
    * Web Speech alert for spoken warnings
    */
   speakWatchlistAlert(

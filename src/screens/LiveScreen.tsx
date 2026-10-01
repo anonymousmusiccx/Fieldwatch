@@ -10,7 +10,7 @@ import {
   SignatureClass,
 } from '../types';
 import { MacUtil } from '../domain/macUtil';
-import { RadarCanvas } from '../components/RadarCanvas';
+import { InteractiveRfRadar } from '../components/InteractiveRfRadar';
 import { Sparkline } from '../components/Sparkline';
 import { PresenceTrack } from '../components/PresenceTrack';
 import {
@@ -29,6 +29,7 @@ interface LiveScreenProps {
   devices: Sighting[];
   fleets: Fleet[];
   viewMode: ViewMode;
+  onChangeViewMode?: (mode: ViewMode) => void;
   sortMode: StrengthSort;
   listSort: ListSort;
   titleLine: ListLine;
@@ -42,12 +43,15 @@ interface LiveScreenProps {
   customNames: Map<string, string>;
   watchlistKeys: Set<string>;
   onSelectDevice: (device: Sighting) => void;
+  onHuntDevice?: (device: Sighting) => void;
+  onToggleWatch?: (device: Sighting) => void;
 }
 
 export const LiveScreen: React.FC<LiveScreenProps> = ({
   devices,
   fleets,
   viewMode,
+  onChangeViewMode,
   titleLine,
   subtitleLine,
   showBar,
@@ -59,8 +63,41 @@ export const LiveScreen: React.FC<LiveScreenProps> = ({
   customNames,
   watchlistKeys,
   onSelectDevice,
+  onHuntDevice,
+  onToggleWatch,
 }) => {
   const fleetMap = new Map(fleets.map((f) => [f.id, f]));
+
+  const renderModeSwitcher = () => (
+    <div className="flex items-center justify-between px-3 pt-2 pb-2 bg-[#0B0F14] border-b border-[#2A3340]/60 select-none">
+      <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] font-mono">
+        {[
+          { id: 'RADAR', label: 'Radar Sweep' },
+          { id: 'BY_CLASS', label: 'By Class' },
+          { id: 'LIST', label: 'Signal List' },
+          { id: 'TIMELINE', label: 'Timeline' },
+          { id: 'HYBRID', label: 'Telemetry' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => onChangeViewMode?.(tab.id as ViewMode)}
+            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors whitespace-nowrap ${
+              viewMode === tab.id
+                ? nightMode
+                  ? 'bg-[#3A1212] text-[#FF5A5A] border border-[#FF5A5A]'
+                  : 'bg-[#163326] text-[#3DFF9A] border border-[#3DFF9A]'
+                : 'text-[#9AA6B2] hover:text-[#D5DCE3] bg-[#141A22] border border-[#2A3340]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <span className="text-[10px] text-[#9AA6B2] shrink-0 ml-2 hidden sm:inline">
+        {devices.length} signals
+      </span>
+    </div>
+  );
 
   const getDeviceTitle = (dev: Sighting): string => {
     const custom = customNames.get(dev.key);
@@ -114,55 +151,66 @@ export const LiveScreen: React.FC<LiveScreenProps> = ({
 
   if (devices.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-80 px-6 text-center">
-        <Radio className="w-10 h-10 text-[#94A3B8]/30 mb-3" />
-        <p className="text-sm font-semibold text-[#F1F5F9]">
-          No radio signals matching current filters
-        </p>
-        <p className="text-xs text-[#94A3B8] mt-1 max-w-xs">
-          Scanning Wi-Fi and Bluetooth LE advertisements. Adjust filter settings or reset filters.
-        </p>
+      <div>
+        {renderModeSwitcher()}
+        <div className="flex flex-col items-center justify-center h-80 px-6 text-center">
+          <Radio className="w-10 h-10 text-[#94A3B8]/30 mb-3" />
+          <p className="text-sm font-semibold text-[#F1F5F9]">
+            No radio signals matching current filters
+          </p>
+          <p className="text-xs text-[#94A3B8] mt-1 max-w-xs">
+            Scanning Wi-Fi and Bluetooth LE advertisements. Adjust filter settings or reset filters.
+          </p>
+        </div>
       </div>
     );
   }
 
-  // 1. CLASSIC RADAR VIEW
+  // 1. INTERACTIVE RF RADAR VIEW
   if (viewMode === 'RADAR') {
     return (
-      <div className="flex flex-col items-center p-3">
-        <RadarCanvas
-          devices={devices}
-          fleets={fleets}
-          selectedKey={null}
-          onSelectDevice={onSelectDevice}
-          demoMode={demoMode}
-          nightMode={nightMode}
-        />
-        <div className="w-full mt-4 max-w-md">
-          <div className="text-xs font-mono font-bold text-[#94A3B8] uppercase mb-2">
-            Target List ({devices.length})
-          </div>
-          <div className="space-y-1.5 max-h-56 overflow-y-auto">
-            {devices.slice(0, 15).map((dev) => (
-              <div
-                key={dev.key}
-                onClick={() => onSelectDevice(dev)}
-                className="flex items-center justify-between p-2.5 rounded-lg bg-[#161B22] border border-[#2E384D] hover:border-[#10E79D] cursor-pointer text-xs font-mono"
-              >
-                <div className="flex items-center gap-2 truncate">
-                  {dev.kind === 'WIFI' ? (
-                    <Wifi className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />
-                  ) : (
-                    <Bluetooth className="w-3.5 h-3.5 text-[#10E79D] shrink-0" />
-                  )}
-                  <span className="truncate">{getDeviceTitle(dev)}</span>
+      <div>
+        {renderModeSwitcher()}
+        <div className="flex flex-col items-center p-2 sm:p-3">
+          <InteractiveRfRadar
+            devices={devices}
+            fleets={fleets}
+            selectedKey={null}
+            onSelectDevice={onSelectDevice}
+            onHuntDevice={onHuntDevice}
+            onToggleWatchlist={onToggleWatch}
+            isWatchedKey={(key) => watchlistKeys.has(key)}
+            customNames={customNames}
+            demoMode={demoMode}
+            nightMode={nightMode}
+          />
+          <div className="w-full mt-2 max-w-xl">
+            <div className="text-xs font-mono font-bold text-[#94A3B8] uppercase mb-2 flex items-center justify-between">
+              <span>Detected Target Table ({devices.length})</span>
+              <span className="text-[10px] text-[#9AA6B2]/70">Tap to inspect or lock</span>
+            </div>
+            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+              {devices.slice(0, 15).map((dev) => (
+                <div
+                  key={dev.key}
+                  onClick={() => onSelectDevice(dev)}
+                  className="flex items-center justify-between p-2.5 rounded-lg bg-[#161B22] border border-[#2E384D] hover:border-[#10E79D] cursor-pointer text-xs font-mono transition-colors"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    {dev.kind === 'WIFI' ? (
+                      <Wifi className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />
+                    ) : (
+                      <Bluetooth className="w-3.5 h-3.5 text-[#10E79D] shrink-0" />
+                    )}
+                    <span className="truncate">{getDeviceTitle(dev)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[#10E79D] font-bold">{dev.rssi} dBm</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8]" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[#10E79D]">{dev.rssi} dBm</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8]" />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -173,37 +221,40 @@ export const LiveScreen: React.FC<LiveScreenProps> = ({
   if (viewMode === 'TIMELINE') {
     const sessionStart = Math.min(...devices.map((d) => d.firstSeen));
     return (
-      <div className="p-3 space-y-2">
-        <div className="flex justify-between text-[11px] font-mono text-[#94A3B8] px-1 pb-1 border-b border-[#2E384D]">
-          <span>RADIO / ACTIVITY SPAN</span>
-          <span>LAST SEEN</span>
-        </div>
-        {devices.map((dev) => (
-          <div
-            key={dev.key}
-            onClick={() => onSelectDevice(dev)}
-            className="p-3 rounded-lg bg-[#161B22] border border-[#2E384D] hover:border-[#10E79D] cursor-pointer text-xs font-mono"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-2 truncate">
-                {dev.kind === 'WIFI' ? (
-                  <Wifi className="w-3.5 h-3.5 text-[#38BDF8]" />
-                ) : (
-                  <Bluetooth className="w-3.5 h-3.5 text-[#10E79D]" />
-                )}
-                <span className="font-semibold text-[#F1F5F9] truncate">
-                  {getDeviceTitle(dev)}
-                </span>
-              </div>
-              <span className="text-[#10E79D]">{dev.rssi} dBm</span>
-            </div>
-            <PresenceTrack
-              presence={dev.presence}
-              sessionStart={sessionStart}
-              color={nightMode ? '#FF5A5A' : '#10E79D'}
-            />
+      <div>
+        {renderModeSwitcher()}
+        <div className="p-3 space-y-2">
+          <div className="flex justify-between text-[11px] font-mono text-[#94A3B8] px-1 pb-1 border-b border-[#2E384D]">
+            <span>RADIO / ACTIVITY SPAN</span>
+            <span>LAST SEEN</span>
           </div>
-        ))}
+          {devices.map((dev) => (
+            <div
+              key={dev.key}
+              onClick={() => onSelectDevice(dev)}
+              className="p-3 rounded-lg bg-[#161B22] border border-[#2E384D] hover:border-[#10E79D] cursor-pointer text-xs font-mono"
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2 truncate">
+                  {dev.kind === 'WIFI' ? (
+                    <Wifi className="w-3.5 h-3.5 text-[#38BDF8]" />
+                  ) : (
+                    <Bluetooth className="w-3.5 h-3.5 text-[#10E79D]" />
+                  )}
+                  <span className="font-semibold text-[#F1F5F9] truncate">
+                    {getDeviceTitle(dev)}
+                  </span>
+                </div>
+                <span className="text-[#10E79D]">{dev.rssi} dBm</span>
+              </div>
+              <PresenceTrack
+                presence={dev.presence}
+                sessionStart={sessionStart}
+                color={nightMode ? '#FF5A5A' : '#10E79D'}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -211,55 +262,58 @@ export const LiveScreen: React.FC<LiveScreenProps> = ({
   // 3. HYBRID + SPARKLINES VIEW
   if (viewMode === 'HYBRID') {
     return (
-      <div className="p-2 overflow-x-auto">
-        <table className="w-full text-left text-xs font-mono border-collapse">
-          <thead>
-            <tr className="border-b border-[#2E384D] text-[#94A3B8] text-[11px]">
-              <th className="py-2 px-2">KIND</th>
-              <th className="py-2 px-2">TARGET</th>
-              <th className="py-2 px-2">RSSI</th>
-              <th className="py-2 px-2">SPARKLINE</th>
-              <th className="py-2 px-2">SIG</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#212836]">
-            {devices.map((dev) => {
-              const sig = dev.fleetIds
-                .map((id) => fleetMap.get(id)?.name)
-                .filter(Boolean)[0];
-              return (
-                <tr
-                  key={dev.key}
-                  onClick={() => onSelectDevice(dev)}
-                  className="hover:bg-[#212836]/60 cursor-pointer"
-                >
-                  <td className="py-2 px-2">
-                    {dev.kind === 'WIFI' ? (
-                      <span className="text-[#38BDF8]">WIFI</span>
-                    ) : (
-                      <span className="text-[#10E79D]">BLE</span>
-                    )}
-                  </td>
-                  <td className="py-2 px-2 font-medium truncate max-w-[140px]">
-                    {getDeviceTitle(dev)}
-                  </td>
-                  <td className="py-2 px-2 text-[#10E79D]">{dev.rssi}</td>
-                  <td className="py-2 px-2">
-                    <Sparkline
-                      history={dev.rssiHistory}
-                      width={54}
-                      height={18}
-                      color={nightMode ? '#FF5A5A' : '#10E79D'}
-                    />
-                  </td>
-                  <td className="py-2 px-2 text-[#F59E0B] truncate max-w-[100px]">
-                    {sig || '—'}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div>
+        {renderModeSwitcher()}
+        <div className="p-2 overflow-x-auto">
+          <table className="w-full text-left text-xs font-mono border-collapse">
+            <thead>
+              <tr className="border-b border-[#2E384D] text-[#94A3B8] text-[11px]">
+                <th className="py-2 px-2">KIND</th>
+                <th className="py-2 px-2">TARGET</th>
+                <th className="py-2 px-2">RSSI</th>
+                <th className="py-2 px-2">SPARKLINE</th>
+                <th className="py-2 px-2">SIG</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#212836]">
+              {devices.map((dev) => {
+                const sig = dev.fleetIds
+                  .map((id) => fleetMap.get(id)?.name)
+                  .filter(Boolean)[0];
+                return (
+                  <tr
+                    key={dev.key}
+                    onClick={() => onSelectDevice(dev)}
+                    className="hover:bg-[#212836]/60 cursor-pointer"
+                  >
+                    <td className="py-2 px-2">
+                      {dev.kind === 'WIFI' ? (
+                        <span className="text-[#38BDF8]">WIFI</span>
+                      ) : (
+                        <span className="text-[#10E79D]">BLE</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 font-medium truncate max-w-[140px]">
+                      {getDeviceTitle(dev)}
+                    </td>
+                    <td className="py-2 px-2 text-[#10E79D]">{dev.rssi}</td>
+                    <td className="py-2 px-2">
+                      <Sparkline
+                        history={dev.rssiHistory}
+                        width={54}
+                        height={18}
+                        color={nightMode ? '#FF5A5A' : '#10E79D'}
+                      />
+                    </td>
+                    <td className="py-2 px-2 text-[#F59E0B] truncate max-w-[100px]">
+                      {sig || '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
@@ -281,34 +335,40 @@ export const LiveScreen: React.FC<LiveScreenProps> = ({
     }
 
     return (
-      <div className="p-3 space-y-4">
-        {Array.from(groups.entries()).map(([clsKey, devs]) => {
-          let label = 'Unclassified';
-          if (clsKey === 'UNCLASSIFIED_WIFI') label = 'Other Wi-Fi Access Points';
-          else if (clsKey === 'UNCLASSIFIED_BLE') label = 'Other Bluetooth LE Radios';
-          else if (SIGNATURE_CLASS_LABELS[clsKey as SignatureClass]) {
-            label = SIGNATURE_CLASS_LABELS[clsKey as SignatureClass];
-          }
+      <div>
+        {renderModeSwitcher()}
+        <div className="p-3 space-y-4">
+          {Array.from(groups.entries()).map(([clsKey, devs]) => {
+            let label = 'Unclassified';
+            if (clsKey === 'UNCLASSIFIED_WIFI') label = 'Other Wi-Fi Access Points';
+            else if (clsKey === 'UNCLASSIFIED_BLE') label = 'Other Bluetooth LE Radios';
+            else if (SIGNATURE_CLASS_LABELS[clsKey as SignatureClass]) {
+              label = SIGNATURE_CLASS_LABELS[clsKey as SignatureClass];
+            }
 
-          return (
-            <div key={clsKey} className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-mono font-bold text-[#94A3B8] px-1">
-                <span>{label.toUpperCase()} ({devs.length})</span>
+            return (
+              <div key={clsKey} className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-mono font-bold text-[#94A3B8] px-1">
+                  <span>{label.toUpperCase()} ({devs.length})</span>
+                </div>
+                <div className="space-y-1.5">
+                  {devs.map((dev) => renderDeviceCard(dev))}
+                </div>
               </div>
-              <div className="space-y-1.5">
-                {devs.map((dev) => renderDeviceCard(dev))}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   }
 
   // 5. DEFAULT STRENGTH LIST VIEW
   return (
-    <div className="p-3 space-y-2">
-      {devices.map((dev) => renderDeviceCard(dev))}
+    <div>
+      {renderModeSwitcher()}
+      <div className="p-3 space-y-2">
+        {devices.map((dev) => renderDeviceCard(dev))}
+      </div>
     </div>
   );
 

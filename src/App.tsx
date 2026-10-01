@@ -46,7 +46,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   alertVoiceWhat: 'BOTH',
   intensity: 'BALANCED',
   keepScreenOn: true,
-  viewMode: 'BY_CLASS',
+  viewMode: 'RADAR',
   strengthSort: 'INSTANT',
   listSort: 'STRENGTH',
   averageWindowSec: 15,
@@ -512,9 +512,17 @@ export const App: React.FC = () => {
             nightMode={settings.nightMode}
             customNames={customNames}
             watchlistKeys={new Set(watchlist.map((w) => w.deviceKey || ''))}
+            onChangeViewMode={(m) => setSettings((prev) => ({ ...prev, viewMode: m }))}
             onSelectDevice={(dev) => {
               setSelectedDevice(dev);
               setCurrentRoute('DETAIL');
+            }}
+            onHuntDevice={(dev) => {
+              setSelectedDevice(dev);
+              setCurrentRoute('HUNT');
+            }}
+            onToggleWatch={(dev) => {
+              handleToggleWatch(dev);
             }}
           />
         )}
