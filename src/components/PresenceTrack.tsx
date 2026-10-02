@@ -1,47 +1,44 @@
 import React from 'react';
-import { PresenceSpan } from '../types';
 
 interface PresenceTrackProps {
-  presence: PresenceSpan[];
-  sessionStart: number;
-  sessionEnd?: number;
-  width?: string;
-  color?: string;
+  rssi: number;
+  minRssi?: number;
+  maxRssi?: number;
+  className?: string;
+  showDbm?: boolean;
 }
 
 export const PresenceTrack: React.FC<PresenceTrackProps> = ({
-  presence,
-  sessionStart,
-  sessionEnd = Date.now(),
-  width = '100%',
-  color = '#10E79D',
+  rssi,
+  minRssi = -95,
+  maxRssi = -30,
+  className = '',
+  showDbm = false,
 }) => {
-  const totalDuration = Math.max(1000, sessionEnd - sessionStart);
+  const percent = Math.max(0, Math.min(100, ((rssi - minRssi) / (maxRssi - minRssi)) * 100));
+
+  let barColor = '#38BDF8';
+  if (percent > 75) barColor = '#F43F5E'; // Immediate / very strong
+  else if (percent > 50) barColor = '#FB923C'; // Near
+  else if (percent > 25) barColor = '#10E79D'; // Tactical
 
   return (
-    <div
-      className="h-2 bg-[#0B0F14] rounded overflow-hidden relative border border-[#2E384D]/60"
-      style={{ width }}
-    >
-      {presence.map((span, idx) => {
-        const startOffset = Math.max(0, span.start - sessionStart);
-        const endOffset = Math.min(totalDuration, (span.end || sessionEnd) - sessionStart);
-        const leftPercent = Math.min(100, Math.max(0, (startOffset / totalDuration) * 100));
-        const widthPercent = Math.max(1, Math.min(100 - leftPercent, ((endOffset - startOffset) / totalDuration) * 100));
-
-        return (
-          <div
-            key={idx}
-            className="absolute top-0 bottom-0 rounded-xs"
-            style={{
-              left: `${leftPercent}%`,
-              width: `${widthPercent}%`,
-              backgroundColor: color,
-              opacity: 0.85,
-            }}
-          />
-        );
-      })}
+    <div className={`flex items-center gap-1.5 ${className}`}>
+      <div className="h-1.5 w-16 bg-[#182230] rounded-full overflow-hidden relative">
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{
+            width: `${percent}%`,
+            backgroundColor: barColor,
+            boxShadow: `0 0 6px ${barColor}80`,
+          }}
+        />
+      </div>
+      {showDbm && (
+        <span className="text-[10px] font-mono tabular-nums font-medium text-[#94A3B8]">
+          {rssi}dBm
+        </span>
+      )}
     </div>
   );
 };

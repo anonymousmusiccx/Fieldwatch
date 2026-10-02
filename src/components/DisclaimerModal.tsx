@@ -10,63 +10,60 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({
   onAccept,
   nightMode = false,
 }) => {
-  const [checked, setChecked] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-[#141A22] border border-[#2A3340] rounded-xl max-w-md w-full p-5 space-y-4 text-xs font-mono shadow-2xl">
-        <div className="flex items-center gap-3 pb-3 border-b border-[#2A3340]">
-          <ShieldAlert className="w-6 h-6 text-[#FFB020] shrink-0" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-[#0F172A] border border-[#334155] rounded-xl p-5 shadow-2xl text-sm font-sans">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2.5 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
           <div>
-            <h2 className="text-sm font-bold text-[#D5DCE3]">
-              OPERATIONAL USE NOTICE
+            <h2 className="text-base font-bold text-white tracking-wide">
+              OPERATIONAL COMPLIANCE & LEGAL NOTICE
             </h2>
-            <p className="text-[11px] text-[#9AA6B2]">
-              Fieldwatch RF Monitoring & Safety Notice
-            </p>
+            <p className="text-xs text-[#94A3B8] font-mono">FIELDWATCH RF MONITORING</p>
           </div>
         </div>
 
-        <div className="space-y-2 text-[#9AA6B2] text-[11px] leading-relaxed max-h-60 overflow-y-auto pr-1">
+        <div className="space-y-3 text-xs text-[#CBD5E1] leading-relaxed mb-5 bg-[#0B0F17] p-3.5 rounded-lg border border-[#1E293B]">
           <p>
-            <strong className="text-[#D5DCE3]">1. Passive Reception Only:</strong>{' '}
-            Fieldwatch operates purely as a passive observer of public Wi-Fi beacon frames and Bluetooth Low Energy advertisements. It does not transmit, deauthenticate, inject, or tamper with wireless signals.
+            Fieldwatch is a <strong>purely passive</strong> tactical radio frequency monitor that visualizes ambient Wi-Fi 802.11 beacon frames and Bluetooth Low Energy advertisements.
           </p>
           <p>
-            <strong className="text-[#D5DCE3]">2. Informational Signatures:</strong>{' '}
-            Signature classifications (AirTags, body cameras, surveillance, drones) are probabilistic heuristic pattern matches against broadcast MAC OUIs, service UUIDs, and manufacturer payloads. False positives and spoofed broadcasts can occur.
+            • <strong>No Transmissions:</strong> This tool performs zero active packet injection, jamming, de-authentication, or payload interception.
           </p>
           <p>
-            <strong className="text-[#D5DCE3]">3. Operator Privacy:</strong>{' '}
-            GPS location data tagged to sightings stays local in your browser session. You can enable Demo Mode in settings to mask MAC addresses and geographic coordinates for screen sharing.
+            • <strong>Privacy & Jurisdiction:</strong> Radio signal monitoring must comply with all applicable local, federal, and international wiretap and surveillance statutes.
           </p>
         </div>
 
-        <label className="flex items-center gap-2.5 p-2.5 rounded bg-[#1B232D] border border-[#2A3340] cursor-pointer hover:border-[#3DFF9A]">
+        <label className="flex items-start gap-2.5 mb-5 cursor-pointer select-none">
           <input
             type="checkbox"
-            checked={checked}
-            onChange={(e) => setChecked(e.target.checked)}
-            className="w-4 h-4 accent-[#3DFF9A] rounded"
+            checked={acknowledged}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+            className="mt-0.5 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500"
           />
-          <span className="text-[11px] text-[#D5DCE3]">
-            I understand and accept operational responsibility.
+          <span className="text-xs text-slate-300">
+            I confirm authorized operational purpose and agree to conduct passive monitoring in compliance with applicable law.
           </span>
         </label>
 
         <button
-          disabled={!checked}
           onClick={onAccept}
-          className={`w-full py-2.5 rounded font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-            checked
+          disabled={!acknowledged}
+          className={`w-full py-2.5 rounded-lg font-semibold text-xs flex items-center justify-center gap-2 transition-all ${
+            acknowledged
               ? nightMode
-                ? 'bg-[#FF3D5A] text-white hover:bg-[#FF5A72]'
-                : 'bg-[#3DFF9A] text-[#003820] hover:bg-[#52FFA8]'
-              : 'bg-[#1B232D] text-[#9AA6B2] opacity-40 cursor-not-allowed'
+                ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                : 'bg-emerald-500 hover:bg-emerald-400 text-black font-bold'
+              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
           }`}
         >
           <Check className="w-4 h-4" />
-          <span>Acknowledge & Enter Monitor</span>
+          <span>INITIALIZE FIELDWATCH SUITE</span>
         </button>
       </div>
     </div>

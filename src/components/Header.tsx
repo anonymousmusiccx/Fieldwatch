@@ -1,85 +1,114 @@
 import React from 'react';
-import { Wifi, Bluetooth, Network, SlidersHorizontal, ChevronUp } from 'lucide-react';
+import {
+  Radio,
+  Volume2,
+  VolumeX,
+  Moon,
+  Sun,
+  Camera,
+  MapPin,
+  Shield,
+  Wifi,
+} from 'lucide-react';
+import { audioService } from '../domain/audioService';
 
 interface HeaderProps {
-  wifiCount: number;
-  bleCount: number;
-  signatureCount: number;
-  isPaused: boolean;
-  sitOpen: boolean;
-  sitName?: string;
-  onViewPicker: () => void;
-  isViewPickerOpen: boolean;
   nightMode: boolean;
+  onToggleNightMode: () => void;
+  gpsActive: boolean;
+  totalDevices: number;
+  threatCount: number;
+  onSnapshotSit?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  wifiCount,
-  bleCount,
-  signatureCount,
-  isPaused,
-  sitOpen,
-  sitName,
-  onViewPicker,
-  isViewPickerOpen,
   nightMode,
+  onToggleNightMode,
+  gpsActive,
+  totalDevices,
+  threatCount,
+  onSnapshotSit,
 }) => {
+  const [muted, setMuted] = React.useState(audioService.getMuted());
+
+  const handleToggleMute = () => {
+    const next = !muted;
+    audioService.setMuted(next);
+    setMuted(next);
+  };
+
   return (
-    <header className="sticky top-0 z-40 bg-[#0B0F14]/90 backdrop-blur border-b border-[#2A3340] px-4 py-2.5 flex items-center justify-between text-xs font-mono">
-      {/* Brand & status title */}
+    <header className="sticky top-0 z-40 w-full bg-[#080D14]/95 backdrop-blur border-b border-[#1E293B] px-3 py-2 flex items-center justify-between text-xs font-mono">
+      {/* App branding */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 font-black text-sm tracking-wider">
-          <span className={nightMode ? 'text-[#FF3D5A]' : 'text-[#3DFF9A]'}>
-            FIELDWATCH
-          </span>
-          {sitOpen ? (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FF3D5A]/20 text-[#FF7A7A] border border-[#FF3D5A]/40 animate-pulse">
-              {sitName ? `SIT: ${sitName}` : 'SIT CAPTURE'}
+        <div className="relative flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-950/70 border border-emerald-500/40 text-[#10E79D]">
+          <Radio className="w-4 h-4 animate-pulse" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400" />
+        </div>
+        <div>
+          <div className="font-bold tracking-wider text-white flex items-center gap-1.5">
+            <span>FIELDWATCH</span>
+            <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">
+              TACTICAL RF
             </span>
-          ) : isPaused ? (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FFB020]/20 text-[#FFB020] border border-[#FFB020]/40">
-              PAUSED
-            </span>
-          ) : (
-            <span className="w-2 h-2 rounded-full bg-[#3DFF9A] animate-ping" />
-          )}
+          </div>
+          <div className="text-[10px] text-[#64748B]">PASSIVE INTERCEPT SUITE</div>
         </div>
       </div>
 
-      {/* Radio counters & view controls */}
-      <div className="flex items-center gap-2">
-        <div className="hidden sm:flex items-center gap-2 px-2 py-1 bg-[#141A22] rounded border border-[#2A3340] text-[11px]">
-          <span className="flex items-center gap-1 text-[#4FC3F7]" title="Wi-Fi APs">
-            <Wifi className="w-3.5 h-3.5" />
-            <span>{wifiCount}</span>
-          </span>
-          <span className="text-[#2A3340]">|</span>
-          <span className="flex items-center gap-1 text-[#3DFF9A]" title="BLE Advertisers">
-            <Bluetooth className="w-3.5 h-3.5" />
-            <span>{bleCount}</span>
-          </span>
-          <span className="text-[#2A3340]">|</span>
-          <span className="flex items-center gap-1 text-[#FFB020]" title="Signatures Matched">
-            <Network className="w-3.5 h-3.5" />
-            <span>{signatureCount}</span>
+      {/* Center status indicators */}
+      <div className="hidden sm:flex items-center gap-3">
+        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#0E1724] border border-[#1E2E42]">
+          <MapPin className={`w-3.5 h-3.5 ${gpsActive ? 'text-emerald-400' : 'text-slate-500'}`} />
+          <span className="text-[11px] text-[#94A3B8]">GPS:</span>
+          <span className={`font-bold ${gpsActive ? 'text-emerald-400' : 'text-slate-400'}`}>
+            {gpsActive ? 'LOCK 3D' : 'SEARCHING'}
           </span>
         </div>
 
+        {threatCount > 0 && (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 text-rose-300 animate-pulse">
+            <Shield className="w-3.5 h-3.5" />
+            <span className="font-bold">{threatCount} PRIORITY TARGETS</span>
+          </div>
+        )}
+      </div>
+
+      {/* Quick Action controls */}
+      <div className="flex items-center gap-1">
+        {onSnapshotSit && (
+          <button
+            onClick={onSnapshotSit}
+            title="Snapshot Situation Report"
+            className="flex items-center gap-1 px-2 py-1 rounded bg-[#0E1724] hover:bg-[#1E2A3A] text-slate-300 border border-[#1E2E42] text-[11px] transition-colors"
+          >
+            <Camera className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden md:inline">SITREP</span>
+          </button>
+        )}
+
         <button
-          onClick={onViewPicker}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold border transition-colors ${
-            isViewPickerOpen
-              ? 'bg-[#163326] text-[#3DFF9A] border-[#3DFF9A]'
-              : 'bg-[#141A22] text-[#9AA6B2] border-[#2A3340] hover:text-[#D5DCE3]'
+          onClick={handleToggleMute}
+          title={muted ? 'Unmute Audio' : 'Mute Audio'}
+          className={`p-1.5 rounded border transition-colors ${
+            muted
+              ? 'bg-[#0E1724] text-slate-500 border-[#1E2E42]'
+              : 'bg-emerald-950/40 text-emerald-400 border-emerald-800'
           }`}
-          title="Tune view and display options"
         >
-          {isViewPickerOpen ? (
-            <ChevronUp className="w-3.5 h-3.5" />
-          ) : (
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-          )}
-          <span>Tune</span>
+          {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </button>
+
+        <button
+          onClick={onToggleNightMode}
+          title={nightMode ? 'Normal Phosphor Mode' : 'FLIR Night Mode'}
+          className={`p-1.5 rounded border transition-colors ${
+            nightMode
+              ? 'bg-rose-950/60 text-rose-400 border-rose-800'
+              : 'bg-[#0E1724] text-slate-300 border-[#1E2E42] hover:text-white'
+          }`}
+        >
+          {nightMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
       </div>
     </header>

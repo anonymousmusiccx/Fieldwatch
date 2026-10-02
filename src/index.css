@@ -4,6 +4,54 @@
   body {
     background-color: #0B0F14;
     color: #D5DCE3;
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace, system-ui;
   }
+}
+
+/* Custom Tactical radar grid & scanline effects */
+.radar-grid {
+  background-image: 
+    radial-gradient(rgba(16, 231, 157, 0.12) 1px, transparent 1px),
+    linear-gradient(to right, rgba(16, 231, 157, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 231, 157, 0.04) 1px, transparent 1px);
+  background-size: 20px 20px, 40px 40px, 40px 40px;
+}
+
+.radar-sweep-cone {
+  background: conic-gradient(
+    from 0deg,
+    rgba(16, 231, 157, 0.4) 0deg,
+    rgba(16, 231, 157, 0.12) 40deg,
+    transparent 65deg,
+    transparent 360deg
+  );
+}
+
+.radar-sweep-cone-crimson {
+  background: conic-gradient(
+    from 0deg,
+    rgba(244, 63, 94, 0.45) 0deg,
+    rgba(244, 63, 94, 0.15) 40deg,
+    transparent 65deg,
+    transparent 360deg
+  );
+}
+
+@keyframes radar-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-radar-spin {
+  animation: radar-spin 3s linear infinite;
+}
+
+@keyframes ping-glow {
+  0% { transform: scale(0.9); opacity: 0.9; }
+  50% { transform: scale(1.4); opacity: 0.3; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.animate-ping-glow {
+  animation: ping-glow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }

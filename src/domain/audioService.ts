@@ -1,105 +1,61 @@
-import { AlertVoiceWhat } from '../types';
-
 class TacticalAudioService {
   private ctx: AudioContext | null = null;
-  private lastGeigerClick = 0;
+  private isMuted: boolean = false;
 
   private getAudioContext(): AudioContext | null {
-    if (typeof window === 'undefined') return null;
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return null;
-    if (!this.ctx) {
-      try {
-        this.ctx = new AudioCtx();
-      } catch {
-        return null;
-      }
-    }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
-    return this.ctx;
-  }
-
-  /**
-   * High-contrast tactical alert double-beep for watchlist/signature hits
-   */
-  playAlertBeep() {
-    const ctx = this.getAudioContext();
-    if (!ctx) return;
-
+    if (this.isMuted) return null;
     try {
-      const now = ctx.currentTime;
-      // First chirp (high tone)
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(1480, now);
-      osc1.frequency.exponentialRampToValueAtTime(1920, now + 0.08);
-      gain1.gain.setValueAtTime(0.2, now);
-      gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.1);
-
-      // Second chirp (even higher tone)
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(2100, now + 0.12);
-      osc2.frequency.exponentialRampToValueAtTime(2600, now + 0.22);
-      gain2.gain.setValueAtTime(0.22, now + 0.12);
-      gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.24);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.12);
-      osc2.stop(now + 0.25);
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        this.ctx = new AudioCtx();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      return this.ctx;
     } catch {
-      // Audio autoplay policy fallback
+      return null;
     }
   }
 
+  setMuted(muted: boolean) {
+    this.isMuted = muted;
+  }
+
+  getMuted(): boolean {
+    return this.isMuted;
+  }
+
   /**
-   * Geiger counter tick for hunt mode based on RSSI strength (-100 to -35 dBm)
+   * Geiger click for proximity hunt
    */
-  tickHuntRssi(rssi: number) {
-    const nowMs = Date.now();
-    // Clamp RSSI between -100 and -35
-    const clamped = Math.max(-100, Math.min(-35, rssi));
-    const factor = (clamped - -100) / (-35 - -100); // 0 (weak) to 1 (max)
-    // Delay: from 800ms (weak) down to 60ms (point blank)
-    const minDelay = 800 - factor * 740;
-
-    if (nowMs - this.lastGeigerClick < minDelay) {
-      return;
-    }
-    this.lastGeigerClick = nowMs;
-
+  playGeigerClick(volume = 0.15) {
     const ctx = this.getAudioContext();
     if (!ctx) return;
-
     try {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      // Crisp click impulse
+
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(1200 + factor * 800, now);
-      osc.frequency.exponentialRampToValueAtTime(160, now + 0.02);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+      osc.frequency.setValueAtTime(1400, now);
+      osc.frequency.exponentialRampToValueAtTime(120, now + 0.02);
+
+      gain.gain.setValueAtTime(volume, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+
       osc.connect(gain);
       gain.connect(ctx.destination);
+
       osc.start(now);
-      osc.stop(now + 0.03);
+      osc.stop(now + 0.025);
     } catch {
-      // audio error handling
+      // AudioContext ignored if blocked
     }
   }
 
   /**
-   * Radar sweep sound
+   * Radar sweep beam sound
    */
   playRadarSweep() {
     const ctx = this.getAudioContext();
@@ -108,65 +64,97 @@ class TacticalAudioService {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
+
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(440, now);
-      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.frequency.setValueAtTime(280, now);
+      osc.frequency.exponentialRampToValueAtTime(420, now + 0.06);
+
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
       osc.connect(gain);
       gain.connect(ctx.destination);
+
       osc.start(now);
-      osc.stop(now + 0.16);
-    } catch {}
+      osc.stop(now + 0.085);
+    } catch {
+      // AudioContext ignored
+    }
   }
 
   /**
-   * Radar target hit acoustic ping (tactical sonar/blip)
+   * Target blip detection sound when sweep beam hits contact
    */
-  playRadarTargetBlip(freq = 920, vol = 0.07) {
+  playRadarTargetBlip(freq = 1150, isThreat = false) {
     const ctx = this.getAudioContext();
     if (!ctx) return;
     try {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.75, now + 0.06);
-      gain.gain.setValueAtTime(vol, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      osc.type = isThreat ? 'sawtooth' : 'sine';
+      osc.frequency.setValueAtTime(isThreat ? 1650 : freq, now);
+      osc.frequency.exponentialRampToValueAtTime(isThreat ? 880 : freq * 0.7, now + 0.12);
+
+      gain.gain.setValueAtTime(isThreat ? 0.22 : 0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+
       osc.connect(gain);
       gain.connect(ctx.destination);
+
       osc.start(now);
-      osc.stop(now + 0.09);
-    } catch {}
+      osc.stop(now + 0.14);
+    } catch {
+      // AudioContext ignored
+    }
   }
 
   /**
-   * Web Speech alert for spoken warnings
+   * Priority alert chirp (Watchlist or Drone detected)
    */
-  speakWatchlistAlert(
-    className: string,
-    fleetName: string,
-    what: AlertVoiceWhat
-  ) {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
+  playTacticalAlert(type: 'WATCHLIST' | 'CLASSIFIED' | 'IMMEDIATE' = 'CLASSIFIED') {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    let phrase = 'Alert.';
-    if (what === 'CLASS') {
-      phrase = `Alert. ${className}.`;
-    } else if (what === 'SIGNATURE') {
-      phrase = `Alert. ${fleetName}.`;
-    } else {
-      phrase = `Alert. ${className}. ${fleetName}.`;
+      osc.type = 'square';
+      const startF = type === 'IMMEDIATE' ? 2200 : type === 'WATCHLIST' ? 1800 : 1200;
+      osc.frequency.setValueAtTime(startF, now);
+      osc.frequency.setValueAtTime(startF * 1.3, now + 0.08);
+      osc.frequency.setValueAtTime(startF * 1.6, now + 0.16);
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.27);
+    } catch {
+      // AudioContext ignored
     }
+  }
 
-    const utterance = new SpeechSynthesisUtterance(phrase);
-    utterance.rate = 1.15;
-    utterance.pitch = 1.0;
-    utterance.volume = 0.9;
-    window.speechSynthesis.speak(utterance);
+  /**
+   * Synthesized voice alerts using Web Speech API
+   */
+  speakTactical(text: string) {
+    if (this.isMuted || !window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.05;
+      utterance.pitch = 0.95;
+      utterance.volume = 0.8;
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // Ignore speech failure
+    }
   }
 }
 

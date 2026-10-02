@@ -1,466 +1,433 @@
-import { RadioKind, Sighting, RssiSample, RadioFacts, Fleet } from '../types';
+import { Sighting, Fleet, RadioKind, SignatureClass } from '../types';
 import { MacUtil } from './macUtil';
-import { STOCK_FLEETS } from './defaultCatalog';
 
-export type SightingCallback = (sightings: Sighting[], newKeys: string[]) => void;
+export const INITIAL_FLEETS: Fleet[] = [
+  {
+    id: 'fleet-drones',
+    name: 'Unmanned Aerial Systems (UAV)',
+    description: 'Commercial & tactical drones broadcasting Remote ID and telemetry',
+    enabled: true,
+    color: '#FB923C',
+    rules: [
+      {
+        id: 'rule-dji',
+        name: 'DJI Drone / DroneID',
+        kind: 'MAC_PREFIX',
+        pattern: '50:02:91',
+        className: 'DRONE_UAV',
+        notes: 'OUI registered to DJI Innovations',
+      },
+      {
+        id: 'rule-dji-2',
+        name: 'DJI Matrice / Mavic RF',
+        kind: 'MAC_PREFIX',
+        pattern: '60:60:1F',
+        className: 'DRONE_UAV',
+      },
+      {
+        id: 'rule-autel',
+        name: 'Autel Robotics UAV',
+        kind: 'MAC_PREFIX',
+        pattern: '9C:8C:F9',
+        className: 'DRONE_UAV',
+      },
+    ],
+  },
+  {
+    id: 'fleet-surveillance',
+    name: 'Surveillance / Cell Intercept',
+    description: 'IMSI Catcher, stingray beacons, and clandestine tracking beacons',
+    enabled: true,
+    color: '#F43F5E',
+    rules: [
+      {
+        id: 'rule-harris',
+        name: 'Harris Tactical Intercept',
+        kind: 'MAC_PREFIX',
+        pattern: '00:12:7F',
+        className: 'SURVEILLANCE',
+      },
+      {
+        id: 'rule-ericsson-imsi',
+        name: 'Cellular Test / Intercept Host',
+        kind: 'MAC_PREFIX',
+        pattern: '00:80:37',
+        className: 'SURVEILLANCE',
+      },
+      {
+        id: 'rule-l3harris',
+        name: 'L3Harris Surveillance Transceiver',
+        kind: 'MAC_PREFIX',
+        pattern: '04:CF:4B',
+        className: 'SURVEILLANCE',
+      },
+    ],
+  },
+  {
+    id: 'fleet-public-safety',
+    name: 'Public Safety & Emergency',
+    description: 'Police APX radios, siren controllers, and emergency services',
+    enabled: true,
+    color: '#EF4444',
+    rules: [
+      {
+        id: 'rule-motorola-apx',
+        name: 'Motorola Solutions APX8000',
+        kind: 'MAC_PREFIX',
+        pattern: '48:2A:E3',
+        className: 'POLICE_EMERGENCY',
+      },
+    ],
+  },
+  {
+    id: 'fleet-wearables',
+    name: 'Body-Worn Gear & Trackers',
+    description: 'Body cameras, tactical wearables, AirTags, and beacons',
+    enabled: true,
+    color: '#A855F7',
+    rules: [
+      {
+        id: 'rule-axon-body',
+        name: 'Axon Body 3 / 4 Camera',
+        kind: 'MAC_PREFIX',
+        pattern: '00:14:B7',
+        className: 'BODY_WORN',
+      },
+      {
+        id: 'rule-airtag',
+        name: 'Apple FindMy / AirTag Beacon',
+        kind: 'MAC_PREFIX',
+        pattern: 'D4:36:39',
+        className: 'BODY_WORN',
+      },
+      {
+        id: 'rule-smarttag',
+        name: 'Samsung SmartTag Ultra',
+        kind: 'MAC_PREFIX',
+        pattern: 'F0:D1:A9',
+        className: 'BODY_WORN',
+      },
+    ],
+  },
+  {
+    id: 'fleet-infrastructure',
+    name: 'Critical Infrastructure & SCADA',
+    description: 'Industrial Wi-Fi APs, utility sensors, and base stations',
+    enabled: true,
+    color: '#34D399',
+    rules: [
+      {
+        id: 'rule-cisco',
+        name: 'Cisco Industrial Catalyst',
+        kind: 'MAC_PREFIX',
+        pattern: '00:16:B6',
+        className: 'INFRASTRUCTURE',
+      },
+    ],
+  },
+];
 
-interface SimulatedEmitter {
-  key: string;
-  kind: RadioKind;
+interface DevicePreset {
   mac: string;
-  name: string;
+  name?: string;
+  ssid?: string;
+  kind: RadioKind;
   baseRssi: number;
+  freq: number;
   channel: number;
-  frequencyMhz: number;
-  vendor: string | null;
-  randomized: boolean;
-  hiddenSsid: boolean;
-  serviceUuids: string[];
-  manufacturerId: number | null;
-  manufacturerDataHex: string;
-  rawHex: string;
-  extras: string;
-  facts?: RadioFacts;
-  baseLat?: number;
-  baseLon?: number;
-  bearingDeg?: number;
-  intervalMs: number;
-  lastEmitted: number;
+  bearing: number;
+  deltaRssi: number;
 }
 
-const INITIAL_EMITTERS: SimulatedEmitter[] = [
-  // 1. Apple AirTag (Find My offline beacon)
+const PRESET_DEVICES: DevicePreset[] = [
   {
-    key: 'BLE:48:2A:E3:89:12:F1',
-    kind: 'BLE',
-    mac: '48:2A:E3:89:12:F1',
-    name: '',
+    mac: '50:02:91:A3:8F:12',
+    name: 'DJI Mavic 3 Pro (RID)',
+    kind: 'WIFI',
     baseRssi: -58,
-    channel: 37,
-    frequencyMhz: 2402,
-    vendor: 'Apple, Inc.',
-    randomized: true,
-    hiddenSsid: false,
-    serviceUuids: ['FD6F'],
-    manufacturerId: 0x004c,
-    manufacturerDataHex: '12191060938b819f05698b0e417a80',
-    rawHex: '0201061bff4c0012191060938b819f05698b0e417a80',
-    extras: 'Find My Offline Beacon',
-    bearingDeg: 34,
-    intervalMs: 2000,
-    lastEmitted: 0,
-  },
-  // 2. Flock Safety ALPR Falcon Camera
-  {
-    key: 'WIFI:70:C9:60:44:81:AA',
-    kind: 'WIFI',
-    mac: '70:C9:60:44:81:AA',
-    name: 'Flock-Falcon-9214',
-    baseRssi: -71,
+    freq: 2437,
     channel: 6,
-    frequencyMhz: 2437,
-    vendor: 'Espressif Inc.',
-    randomized: false,
-    hiddenSsid: false,
-    serviceUuids: [],
-    manufacturerId: null,
-    manufacturerDataHex: '',
-    rawHex: '',
-    extras: 'Automated License Plate Reader (ALPR)',
-    bearingDeg: 142,
-    intervalMs: 1500,
-    lastEmitted: 0,
+    bearing: 42,
+    deltaRssi: 3,
   },
-  // 3. Axon Body 3 Camera (Law Enforcement)
   {
-    key: 'BLE:00:25:DF:B8:31:09',
-    kind: 'BLE',
-    mac: '00:25:DF:B8:31:09',
-    name: 'AXON_BODY_3_X819',
-    baseRssi: -66,
-    channel: 38,
-    frequencyMhz: 2426,
-    vendor: 'Axon Enterprise, Inc.',
-    randomized: false,
-    hiddenSsid: false,
-    serviceUuids: ['FEBA', '180A'],
-    manufacturerId: 0x05a1,
-    manufacturerDataHex: '05a1030100',
-    rawHex: '',
-    extras: 'Axon Body-Worn Video Camera',
-    bearingDeg: 215,
-    intervalMs: 1200,
-    lastEmitted: 0,
-  },
-  // 4. Samsung Galaxy SmartTag2
-  {
-    key: 'BLE:5C:CB:99:11:4F:72',
-    kind: 'BLE',
-    mac: '5C:CB:99:11:4F:72',
-    name: 'SmartTag-4F72',
-    baseRssi: -62,
-    channel: 39,
-    frequencyMhz: 2480,
-    vendor: 'Samsung Electronics',
-    randomized: true,
-    hiddenSsid: false,
-    serviceUuids: ['FD5A'],
-    manufacturerId: 0x0075,
-    manufacturerDataHex: '42010833a1',
-    rawHex: '',
-    extras: 'Samsung SmartThings Find Beacon',
-    bearingDeg: 88,
-    intervalMs: 2500,
-    lastEmitted: 0,
-  },
-  // 5. DJI Drone Remote ID (OpenDroneID / FAA Broadcast)
-  {
-    key: 'BLE:60:60:1F:D3:99:04',
-    kind: 'BLE',
-    mac: '60:60:1F:D3:99:04',
-    name: 'RID-1581F4B929',
-    baseRssi: -79,
-    channel: 37,
-    frequencyMhz: 2402,
-    vendor: 'DJI Technology Co., Ltd.',
-    randomized: false,
-    hiddenSsid: false,
-    serviceUuids: ['FFFA'],
-    manufacturerId: 0x089a,
-    manufacturerDataHex: '19fa01001581f4b929',
-    rawHex: '',
-    extras: 'OpenDroneID UAS Telemetry Broadcast',
-    bearingDeg: 310,
-    intervalMs: 1000,
-    lastEmitted: 0,
-  },
-  // 6. Flipper Zero (Sub-GHz / BadUSB Pentest Tool)
-  {
-    key: 'BLE:B4:E6:2D:88:51:7A',
-    kind: 'BLE',
-    mac: 'B4:E6:2D:88:51:7A',
-    name: 'Flipper_Dr4g0n',
-    baseRssi: -52,
-    channel: 38,
-    frequencyMhz: 2426,
-    vendor: 'Espressif Inc.',
-    randomized: false,
-    hiddenSsid: false,
-    serviceUuids: ['3082'],
-    manufacturerId: null,
-    manufacturerDataHex: '',
-    rawHex: '',
-    extras: 'Flipper Zero Multi-tool',
-    bearingDeg: 190,
-    intervalMs: 1800,
-    lastEmitted: 0,
-  },
-  // 7. Ray-Ban Meta Smart Glasses
-  {
-    key: 'BLE:24:29:34:F1:C0:11',
-    kind: 'BLE',
-    mac: '24:29:34:F1:C0:11',
-    name: 'Ray-Ban Meta 901',
-    baseRssi: -74,
-    channel: 39,
-    frequencyMhz: 2480,
-    vendor: 'Meta Platforms Inc.',
-    randomized: true,
-    hiddenSsid: false,
-    serviceUuids: ['FE2C'],
-    manufacturerId: 0x01ab,
-    manufacturerDataHex: '02049184',
-    rawHex: '',
-    extras: 'Smart Audio/Camera Eyewear',
-    bearingDeg: 275,
-    intervalMs: 3000,
-    lastEmitted: 0,
-  },
-  // 8. Hidden Wi-Fi AP (Surveillance/Tactical)
-  {
-    key: 'WIFI:00:1E:E5:A9:12:44',
+    mac: '00:12:7F:8C:22:90',
+    name: 'Harris Stingray Cell Test',
     kind: 'WIFI',
-    mac: '00:1E:E5:A9:12:44',
-    name: '',
-    baseRssi: -64,
-    channel: 11,
-    frequencyMhz: 2462,
-    vendor: 'Cisco Systems',
-    randomized: false,
-    hiddenSsid: true,
-    serviceUuids: [],
-    manufacturerId: null,
-    manufacturerDataHex: '',
-    rawHex: '',
-    extras: 'Stealth / Closed Enterprise WLAN',
-    bearingDeg: 45,
-    intervalMs: 1000,
-    lastEmitted: 0,
-  },
-  // 9. UniFi Enterprise Access Point
-  {
-    key: 'WIFI:AC:8B:A9:43:10:E2',
-    kind: 'WIFI',
-    mac: 'AC:8B:A9:43:10:E2',
-    name: 'UBNT-Office-Mesh-5G',
-    baseRssi: -48,
+    baseRssi: -49,
+    freq: 5180,
     channel: 36,
-    frequencyMhz: 5180,
-    vendor: 'Ubiquiti Networks',
-    randomized: false,
-    hiddenSsid: false,
-    serviceUuids: [],
-    manufacturerId: null,
-    manufacturerDataHex: '',
-    rawHex: '',
-    extras: 'Wi-Fi 6 AP (5GHz band)',
-    bearingDeg: 12,
-    intervalMs: 800,
-    lastEmitted: 0,
+    bearing: 195,
+    deltaRssi: 2,
   },
-  // 10. Google Fast Pair Device (Pixel Buds Pro)
   {
-    key: 'BLE:78:28:CA:33:B1:05',
+    mac: '00:14:B7:6E:9B:41',
+    name: 'Axon Body 3 [ID: 9481]',
     kind: 'BLE',
-    mac: '78:28:CA:33:B1:05',
-    name: 'Pixel Buds Pro',
-    baseRssi: -55,
+    baseRssi: -62,
+    freq: 2402,
     channel: 37,
-    frequencyMhz: 2402,
-    vendor: 'Google LLC',
-    randomized: true,
-    hiddenSsid: false,
-    serviceUuids: ['FE2C'],
-    manufacturerId: 0x00e0,
-    manufacturerDataHex: 'e0000214a0',
-    rawHex: '',
-    extras: 'Fast Pair Audio Peripheral',
-    bearingDeg: 160,
-    intervalMs: 1400,
-    lastEmitted: 0,
+    bearing: 280,
+    deltaRssi: 4,
+  },
+  {
+    mac: '48:2A:E3:D0:11:7A',
+    name: 'APX8000 P25 Tactical Radio',
+    kind: 'BLE',
+    baseRssi: -71,
+    freq: 2426,
+    channel: 38,
+    bearing: 110,
+    deltaRssi: 5,
+  },
+  {
+    mac: 'D4:36:39:1A:BC:88',
+    name: 'AirTag Proximity Beacon',
+    kind: 'BLE',
+    baseRssi: -44,
+    freq: 2480,
+    channel: 39,
+    bearing: 315,
+    deltaRssi: 2,
+  },
+  {
+    mac: '00:16:B6:54:19:EA',
+    ssid: 'TAC-COMM-SECURE-AP',
+    kind: 'WIFI',
+    baseRssi: -53,
+    freq: 5240,
+    channel: 48,
+    bearing: 15,
+    deltaRssi: 2,
+  },
+  {
+    mac: 'E4:5F:01:99:3B:1C',
+    ssid: 'RaspberryPi-Mesh-Node',
+    kind: 'WIFI',
+    baseRssi: -67,
+    freq: 2462,
+    channel: 11,
+    bearing: 155,
+    deltaRssi: 4,
+  },
+  {
+    mac: 'F4:F5:D8:0C:44:EE',
+    name: 'Google Pixel 8 Pro',
+    kind: 'BLE',
+    baseRssi: -74,
+    freq: 2402,
+    channel: 37,
+    bearing: 245,
+    deltaRssi: 6,
+  },
+  {
+    mac: '60:F4:45:88:12:34',
+    name: 'Apple iPhone 15 Pro',
+    kind: 'BLE',
+    baseRssi: -65,
+    freq: 2426,
+    channel: 38,
+    bearing: 70,
+    deltaRssi: 3,
+  },
+  {
+    mac: '00:80:37:33:91:AA',
+    ssid: 'GSM-TEST-BASE-09',
+    kind: 'WIFI',
+    baseRssi: -79,
+    freq: 2412,
+    channel: 1,
+    bearing: 330,
+    deltaRssi: 5,
   },
 ];
 
 export class ScannerService {
+  private activeDevices: Map<string, Sighting> = new Map();
   private timer: number | null = null;
-  private isScanning = false;
-  private sightingsMap = new Map<string, Sighting>();
-  private emitters: SimulatedEmitter[] = [...INITIAL_EMITTERS];
-  private callback: SightingCallback | null = null;
-  private currentLat = 37.7749;
-  private currentLon = -122.4194;
-  private activeFleets: Fleet[] = STOCK_FLEETS;
+  private listeners: Set<(devices: Sighting[]) => void> = new Set();
+  private fleets: Fleet[] = INITIAL_FLEETS;
 
   constructor() {
-    this.initStockSightings();
+    this.initMockSightings();
   }
 
   setFleets(fleets: Fleet[]) {
-    this.activeFleets = fleets;
-    // Re-evaluate signatures
-    this.matchFleetsForSightings();
+    this.fleets = fleets;
+    this.reclassifyAll();
   }
 
-  private initStockSightings() {
+  private initMockSightings() {
     const now = Date.now();
-    for (const emitter of this.emitters) {
-      const dev = this.createOrUpdateSighting(emitter, now - 60000, 0);
-      this.sightingsMap.set(dev.key, dev);
+    PRESET_DEVICES.forEach((preset, index) => {
+      const { matchedClass, matchedFleet, matchedRule } = this.matchDevice(
+        preset.mac,
+        preset.ssid || preset.name || ''
+      );
+
+      const proximity = MacUtil.estimateProximity(preset.baseRssi, preset.kind);
+
+      const sighting: Sighting = {
+        key: preset.mac,
+        mac: preset.mac,
+        kind: preset.kind,
+        name: preset.name,
+        ssid: preset.ssid,
+        rssi: preset.baseRssi,
+        rssiHistory: [
+          preset.baseRssi - 3,
+          preset.baseRssi + 1,
+          preset.baseRssi - 1,
+          preset.baseRssi + 2,
+          preset.baseRssi,
+        ],
+        firstSeenMs: now - (index * 24000 + 45000),
+        lastSeenMs: now - index * 1200,
+        matchedClass,
+        matchedFleet,
+        matchedRule,
+        frequencyMhz: preset.freq,
+        channel: preset.channel,
+        packetCount: 12 + index * 8,
+        ouiVendor: MacUtil.getVendor(preset.mac),
+        estimatedDistanceMeters: proximity.meters,
+        bearingDeg: preset.bearing,
+      };
+
+      this.activeDevices.set(preset.mac, sighting);
+    });
+  }
+
+  private matchDevice(
+    mac?: string | null,
+    label?: string | null
+  ): {
+    matchedClass?: SignatureClass;
+    matchedFleet?: string;
+    matchedRule?: string;
+  } {
+    if (!mac || typeof mac !== 'string') {
+      return { matchedClass: 'UNKNOWN' };
     }
-    this.matchFleetsForSightings();
+    const cleanMac = mac.replace(/[:-]/g, '').toUpperCase();
+    const safeLabel = label || '';
+
+    if (!Array.isArray(this.fleets)) {
+      return { matchedClass: 'UNKNOWN' };
+    }
+
+    for (const fleet of this.fleets) {
+      if (!fleet || !fleet.enabled || !Array.isArray(fleet.rules)) continue;
+      for (const rule of fleet.rules) {
+        if (!rule || !rule.pattern || typeof rule.pattern !== 'string') continue;
+        if (rule.kind === 'MAC_PREFIX' || rule.kind === 'OUI') {
+          const ruleClean = rule.pattern.replace(/[:-]/g, '').toUpperCase();
+          if (cleanMac.startsWith(ruleClean)) {
+            return {
+              matchedClass: rule.className,
+              matchedFleet: fleet.name,
+              matchedRule: rule.name,
+            };
+          }
+        } else if (rule.kind === 'SSID_REGEX') {
+          try {
+            const re = new RegExp(rule.pattern, 'i');
+            if (re.test(safeLabel)) {
+              return {
+                matchedClass: rule.className,
+                matchedFleet: fleet.name,
+                matchedRule: rule.name,
+              };
+            }
+          } catch {
+            // invalid regex
+          }
+        }
+      }
+    }
+
+    return { matchedClass: 'UNKNOWN' };
   }
 
-  setGpsLocation(lat: number, lon: number) {
-    this.currentLat = lat;
-    this.currentLon = lon;
+  private reclassifyAll() {
+    this.activeDevices.forEach((dev) => {
+      const matched = this.matchDevice(dev.mac, dev.ssid || dev.name || '');
+      dev.matchedClass = matched.matchedClass;
+      dev.matchedFleet = matched.matchedFleet;
+      dev.matchedRule = matched.matchedRule;
+    });
+    this.notify();
   }
 
-  start(cb: SightingCallback, intervalMs = 1200) {
-    this.callback = cb;
-    this.isScanning = true;
-
-    // Immediately trigger initial callback
-    this.triggerCallback([]);
-
-    if (this.timer) clearInterval(this.timer);
+  start(intervalMs = 1200) {
+    if (this.timer) return;
     this.timer = window.setInterval(() => {
-      if (!this.isScanning) return;
-      this.stepScan();
+      this.tick();
     }, intervalMs);
   }
 
   stop() {
-    this.isScanning = false;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
     }
   }
 
-  pause() {
-    this.isScanning = false;
+  subscribe(cb: (devices: Sighting[]) => void): () => void {
+    this.listeners.add(cb);
+    cb(this.getDevices());
+    return () => this.listeners.delete(cb);
   }
 
-  resume() {
-    this.isScanning = true;
+  private notify() {
+    const list = this.getDevices();
+    this.listeners.forEach((cb) => cb(list));
   }
 
-  getSightings(): Sighting[] {
-    return Array.from(this.sightingsMap.values());
+  getDevices(): Sighting[] {
+    return Array.from(this.activeDevices.values());
   }
 
-  private stepScan() {
+  private tick() {
     const now = Date.now();
-    const newKeys: string[] = [];
 
-    // Pick 2-4 emitters to advertise in this cycle
-    const sampleCount = Math.floor(Math.random() * 3) + 2;
-    for (let i = 0; i < sampleCount; i++) {
-      const emitter = this.emitters[Math.floor(Math.random() * this.emitters.length)];
-      const isNew = !this.sightingsMap.has(emitter.key);
-      const dev = this.createOrUpdateSighting(emitter, now, (Math.random() - 0.5) * 6);
-      this.sightingsMap.set(dev.key, dev);
-      if (isNew) {
-        newKeys.push(dev.key);
-      }
-    }
+    // Randomly update 2-4 devices with new RSSI and packet count
+    this.activeDevices.forEach((dev) => {
+      if (Math.random() > 0.4) {
+        const delta = Math.floor((Math.random() - 0.48) * 6);
+        let newRssi = dev.rssi + delta;
+        if (newRssi > -30) newRssi = -32;
+        if (newRssi < -92) newRssi = -90;
 
-    this.matchFleetsForSightings();
-    this.triggerCallback(newKeys);
-  }
+        dev.rssi = newRssi;
+        dev.rssiHistory.push(newRssi);
+        if (dev.rssiHistory.length > 20) {
+          dev.rssiHistory.shift();
+        }
+        dev.lastSeenMs = now;
+        dev.packetCount += Math.floor(Math.random() * 4) + 1;
 
-  private createOrUpdateSighting(
-    emitter: SimulatedEmitter,
-    now: number,
-    noise: number
-  ): Sighting {
-    const existing = this.sightingsMap.get(emitter.key);
-    const instantRssi = Math.round(emitter.baseRssi + noise);
+        const proximity = MacUtil.estimateProximity(newRssi, dev.kind);
+        dev.estimatedDistanceMeters = proximity.meters;
 
-    const history: RssiSample[] = existing ? [...existing.rssiHistory] : [];
-    history.push({ at: now, rssi: instantRssi });
-    if (history.length > 50) history.shift();
-
-    // Calculate presence spans (group hits within 15 seconds)
-    const presence = existing ? [...existing.presence] : [];
-    if (presence.length === 0) {
-      presence.push({ start: now, end: now });
-    } else {
-      const lastSpan = presence[presence.length - 1];
-      if (lastSpan.end && now - lastSpan.end < 15000) {
-        lastSpan.end = now;
-      } else {
-        presence.push({ start: now, end: now });
-      }
-    }
-
-    const minRssi = existing ? Math.min(existing.rssiMin, instantRssi) : instantRssi;
-    const maxRssi = existing ? Math.max(existing.rssiMax, instantRssi) : instantRssi;
-
-    return {
-      key: emitter.key,
-      kind: emitter.kind,
-      mac: emitter.mac,
-      name: emitter.name,
-      rssi: instantRssi,
-      rssiMin: minRssi,
-      rssiMax: maxRssi,
-      channel: emitter.channel,
-      frequencyMhz: emitter.frequencyMhz,
-      vendor: emitter.vendor,
-      randomized: emitter.randomized,
-      hiddenSsid: emitter.hiddenSsid,
-      serviceUuids: emitter.serviceUuids,
-      manufacturerId: emitter.manufacturerId,
-      manufacturerDataHex: emitter.manufacturerDataHex,
-      rawHex: emitter.rawHex,
-      extras: emitter.extras,
-      firstSeen: existing ? existing.firstSeen : now,
-      lastSeen: now,
-      hitCount: (existing ? existing.hitCount : 0) + 1,
-      fleetIds: existing ? existing.fleetIds : [],
-      rssiHistory: history,
-      presence,
-      latitude: this.currentLat + (Math.random() - 0.5) * 0.0003,
-      longitude: this.currentLon + (Math.random() - 0.5) * 0.0003,
-      bearingDeg: emitter.bearingDeg || Math.floor(Math.random() * 360),
-    };
-  }
-
-  private matchFleetsForSightings() {
-    for (const dev of this.sightingsMap.values()) {
-      const matchedIds: string[] = [];
-      for (const fleet of this.activeFleets) {
-        if (!fleet.enabled) continue;
-        const matches = this.evaluateFleetRules(dev, fleet);
-        if (matches) {
-          matchedIds.push(fleet.id);
+        // Slight drift in bearing
+        if (dev.bearingDeg !== undefined) {
+          dev.bearingDeg = (dev.bearingDeg + (Math.random() - 0.5) * 4 + 360) % 360;
         }
       }
-      dev.fleetIds = matchedIds;
-    }
+    });
+
+    this.notify();
   }
 
-  private evaluateFleetRules(dev: Sighting, fleet: Fleet): boolean {
-    if (!fleet.rules || fleet.rules.length === 0) return false;
-
-    const results = fleet.rules
-      .filter((r) => r.enabled)
-      .map((rule) => {
-        switch (rule.kind) {
-          case 'RADIO_KIND':
-            return rule.radio ? dev.kind === rule.radio : true;
-          case 'HIDDEN_SSID':
-            return dev.hiddenSsid;
-          case 'NAME_CONTAINS':
-            return rule.text ? dev.name.toLowerCase().includes(rule.text.toLowerCase()) : false;
-          case 'MAC_PREFIX':
-            return rule.text ? MacUtil.matchesPrefix(dev.mac, rule.text) : false;
-          case 'OUI':
-            return rule.text
-              ? dev.mac.toUpperCase().startsWith(rule.text.toUpperCase()) ||
-                  (dev.vendor ? dev.vendor.toLowerCase().includes(rule.text.toLowerCase()) : false)
-              : false;
-          case 'SERVICE_UUID':
-            return rule.text
-              ? dev.serviceUuids.some((uuid) =>
-                  uuid.toUpperCase().includes(rule.text!.toUpperCase())
-                )
-              : false;
-          case 'MANUFACTURER_ID':
-            return rule.companyId !== undefined ? dev.manufacturerId === rule.companyId : false;
-          case 'MANUFACTURER_DATA':
-            if (rule.companyId !== undefined && dev.manufacturerId !== rule.companyId) {
-              return false;
-            }
-            if (rule.dataPrefixHex) {
-              return dev.manufacturerDataHex
-                .toLowerCase()
-                .startsWith(rule.dataPrefixHex.toLowerCase());
-            }
-            return true;
-          default:
-            return false;
-        }
-      });
-
-    if (results.length === 0) return false;
-    return fleet.matchAny ? results.some(Boolean) : results.every(Boolean);
+  addManualSighting(sighting: Sighting) {
+    this.activeDevices.set(sighting.key, sighting);
+    this.notify();
   }
 
-  private triggerCallback(newKeys: string[]) {
-    if (this.callback) {
-      this.callback(Array.from(this.sightingsMap.values()), newKeys);
-    }
-  }
-
-  loadSightingsFromData(sightings: Sighting[]) {
-    this.sightingsMap.clear();
-    for (const s of sightings) {
-      this.sightingsMap.set(s.key, s);
-    }
-    this.matchFleetsForSightings();
-    this.triggerCallback([]);
+  clear() {
+    this.activeDevices.clear();
+    this.notify();
   }
 }
 

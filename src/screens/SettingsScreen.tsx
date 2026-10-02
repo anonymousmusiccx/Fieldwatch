@@ -1,304 +1,126 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { AppSettings } from '../types';
 import {
-  AppSettings,
-  AlertVoiceWhat,
-  ScanIntensity,
-  LogFormat,
-} from '../types';
-import { audioService } from '../domain/audioService';
-import {
-  Moon,
+  Settings,
   Volume2,
-  VolumeX,
-  Mic,
-  Shield,
+  MapPin,
+  Moon,
+  Zap,
   Radio,
-  Share2,
-  Download,
-  Upload,
-  Info,
-  Smartphone,
-  Bookmark,
-  ChevronRight,
+  Sliders,
 } from 'lucide-react';
 
 interface SettingsScreenProps {
   settings: AppSettings;
-  onChangeSettings: (s: AppSettings) => void;
-  onOpenBookmarks: () => void;
-  onShowDisclaimer: () => void;
-  onExportSettings: () => void;
-  onImportSettings: (jsonStr: string) => void;
-  nightMode: boolean;
+  onChangeSettings: (next: AppSettings) => void;
+  onClearData?: () => void;
+  nightMode?: boolean;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   settings,
   onChangeSettings,
-  onOpenBookmarks,
-  onShowDisclaimer,
-  onExportSettings,
-  onImportSettings,
-  nightMode,
+  onClearData,
+  nightMode = false,
 }) => {
-  const handleTestChirp = () => {
-    audioService.playAlertBeep();
-    if (settings.alertVoice) {
-      setTimeout(() => {
-        audioService.speakWatchlistAlert(
-          'Finder tags',
-          'Apple AirTags',
-          settings.alertVoiceWhat
-        );
-      }, 350);
-    }
-  };
-
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const content = evt.target?.result as string;
-      if (content) {
-        onImportSettings(content);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   return (
-    <div className="p-4 max-w-xl mx-auto space-y-6 pb-28 text-xs font-mono">
-      <div className="pb-3 border-b border-[#2A3340]">
-        <h2 className="text-sm font-bold text-[#D5DCE3]">SETTINGS</h2>
-        <p className="text-[11px] text-[#9AA6B2]">
-          Hardware, tactical audio, privacy mode, and display configuration
-        </p>
+    <div className="max-w-xl mx-auto p-3 sm:p-4 font-mono text-xs select-none">
+      <div className="flex items-center gap-2 pb-3 mb-4 border-b border-[#1E293B]">
+        <Settings className="w-5 h-5 text-emerald-400" />
+        <h1 className="text-sm font-bold text-white tracking-wider">SYSTEM CONFIGURATION</h1>
       </div>
 
-      {/* Night Mode & Tactical Cockpit */}
-      <div className="p-3 bg-[#141A22] rounded-xl border border-[#2A3340] space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Moon className="w-4 h-4 text-[#FF5A5A]" />
-            <div>
-              <span className="font-semibold text-xs text-[#D5DCE3] block">
-                Night Mode (Cockpit Red)
-              </span>
-              <span className="text-[11px] text-[#9AA6B2] leading-tight block">
-                Transforms full UI into red-on-black tactical field display
-              </span>
-            </div>
+      <div className="space-y-4">
+        {/* Audio Alerts */}
+        <div className="bg-[#080D14] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
+          <div className="flex items-center gap-2 text-white font-bold pb-2 border-b border-[#1E293B]">
+            <Volume2 className="w-4 h-4 text-emerald-400" />
+            <span>AUDIBLE NOTIFICATIONS & SYNTHESIS</span>
           </div>
 
-          <button
-            onClick={() =>
-              onChangeSettings({ ...settings, nightMode: !settings.nightMode })
-            }
-            className={`w-10 h-5 rounded-full p-0.5 transition-colors relative ${
-              settings.nightMode ? 'bg-[#FF5A5A]' : 'bg-[#2A3340]'
-            }`}
-          >
-            <div
-              className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                settings.nightMode ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-      </div>
-
-      {/* Bookmarked Radios Shortcut */}
-      <div
-        onClick={onOpenBookmarks}
-        className="p-3 bg-[#141A22] rounded-xl border border-[#2A3340] hover:border-[#3DFF9A]/40 transition-colors flex items-center justify-between cursor-pointer"
-      >
-        <div className="flex items-center gap-2.5">
-          <Bookmark className="w-4 h-4 text-[#FFB020]" />
-          <div>
-            <span className="font-semibold text-xs text-[#D5DCE3] block">
-              Bookmarked & Named Radios
-            </span>
-            <span className="text-[11px] text-[#9AA6B2] block">
-              Manage custom labels, observer notes, and alert targets
-            </span>
-          </div>
-        </div>
-        <ChevronRight className="w-4 h-4 text-[#9AA6B2]" />
-      </div>
-
-      {/* Audio & Voice Alerts */}
-      <div className="p-3 bg-[#141A22] rounded-xl border border-[#2A3340] space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-[#3DFF9A]" />
-            <span className="font-semibold text-xs text-[#D5DCE3]">
-              Tactical Audio & Voice Alerts
-            </span>
-          </div>
-          <button
-            onClick={handleTestChirp}
-            className="px-2.5 py-1 rounded bg-[#1B232D] border border-[#2A3340] text-[11px] text-[#3DFF9A] hover:border-[#3DFF9A]"
-          >
-            Test Alert
-          </button>
-        </div>
-
-        <div className="space-y-2 pt-1 border-t border-[#2A3340]/60">
           <label className="flex items-center justify-between cursor-pointer">
             <div>
-              <span className="text-[#D5DCE3] block">Watchlist Alert Chime</span>
-              <span className="text-[11px] text-[#9AA6B2] block">
-                Two-tone tactical chirp on watchlist hit
-              </span>
+              <div className="font-bold text-white">Audio Alert Tones</div>
+              <div className="text-[10px] text-slate-500">Chirp on priority threat contacts</div>
             </div>
             <input
               type="checkbox"
               checked={settings.alertBeep}
-              onChange={(e) =>
-                onChangeSettings({ ...settings, alertBeep: e.target.checked })
-              }
-              className="accent-[#3DFF9A] w-4 h-4"
+              onChange={(e) => onChangeSettings({ ...settings, alertBeep: e.target.checked })}
+              className="accent-emerald-500 w-4 h-4"
             />
           </label>
 
           <label className="flex items-center justify-between cursor-pointer">
             <div>
-              <span className="text-[#D5DCE3] block">Speech Synthesis Voice</span>
-              <span className="text-[11px] text-[#9AA6B2] block">
-                Speaks detection over speaker/headset
-              </span>
+              <div className="font-bold text-white">Synthesized Voice Alerts</div>
+              <div className="text-[10px] text-slate-500">Read threat class aloud via Web Speech API</div>
             </div>
             <input
               type="checkbox"
               checked={settings.alertVoice}
-              onChange={(e) =>
-                onChangeSettings({ ...settings, alertVoice: e.target.checked })
-              }
-              className="accent-[#3DFF9A] w-4 h-4"
+              onChange={(e) => onChangeSettings({ ...settings, alertVoice: e.target.checked })}
+              className="accent-emerald-500 w-4 h-4"
             />
           </label>
-
-          {settings.alertVoice && (
-            <div className="pt-2">
-              <label className="text-[11px] text-[#9AA6B2] block mb-1">
-                WHAT VOICE SAYS
-              </label>
-              <select
-                value={settings.alertVoiceWhat}
-                onChange={(e) =>
-                  onChangeSettings({
-                    ...settings,
-                    alertVoiceWhat: e.target.value as AlertVoiceWhat,
-                  })
-                }
-                className="w-full bg-[#1B232D] border border-[#2A3340] rounded p-2 text-xs text-[#D5DCE3]"
-              >
-                <option value="BOTH">Class + Signature (e.g. "Finder tags, Apple AirTags")</option>
-                <option value="SIGNATURE">Signature Name Only</option>
-                <option value="CLASS">Class Category Only</option>
-              </select>
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* Privacy / Demo Mode */}
-      <div className="p-3 bg-[#141A22] rounded-xl border border-[#2A3340] space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Shield className="w-4 h-4 text-[#4FC3F7]" />
-            <div>
-              <span className="font-semibold text-xs text-[#D5DCE3] block">
-                Privacy / Demo Masking
-              </span>
-              <span className="text-[11px] text-[#9AA6B2] leading-tight block">
-                Masks MAC address tails (**:**:**) and redacts GPS coordinates on screens and reports
-              </span>
-            </div>
+        {/* GPS Location Tagging */}
+        <div className="bg-[#080D14] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
+          <div className="flex items-center gap-2 text-white font-bold pb-2 border-b border-[#1E293B]">
+            <MapPin className="w-4 h-4 text-sky-400" />
+            <span>OPERATOR GEOLOCATION</span>
           </div>
 
-          <button
-            onClick={() =>
-              onChangeSettings({ ...settings, demoMode: !settings.demoMode })
-            }
-            className={`w-10 h-5 rounded-full p-0.5 transition-colors relative ${
-              settings.demoMode ? 'bg-[#3DFF9A]' : 'bg-[#2A3340]'
-            }`}
-          >
-            <div
-              className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                settings.demoMode ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-      </div>
-
-      {/* Display & Screen Awake */}
-      <div className="p-3 bg-[#141A22] rounded-xl border border-[#2A3340] space-y-3">
-        <label className="flex items-center justify-between cursor-pointer">
-          <div className="flex items-center gap-2.5">
-            <Smartphone className="w-4 h-4 text-[#3DFF9A]" />
+          <label className="flex items-center justify-between cursor-pointer">
             <div>
-              <span className="font-semibold text-xs text-[#D5DCE3] block">
-                Keep Screen Awake
-              </span>
-              <span className="text-[11px] text-[#9AA6B2] block">
-                Prevents display sleep during active field monitoring
-              </span>
+              <div className="font-bold text-white">Geotag Radio Fixes</div>
+              <div className="text-[10px] text-slate-500">Attach latitude/longitude to detected packets</div>
             </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={settings.keepScreenOn}
-            onChange={(e) =>
-              onChangeSettings({ ...settings, keepScreenOn: e.target.checked })
-            }
-            className="accent-[#3DFF9A] w-4 h-4"
-          />
-        </label>
-      </div>
-
-      {/* Backup, Restore & License */}
-      <div className="p-3 bg-[#141A22] rounded-xl border border-[#2A3340] space-y-3">
-        <div className="font-semibold text-xs text-[#D5DCE3]">
-          CONFIGURATION BACKUP & LEGAL
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={onExportSettings}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-[#1B232D] border border-[#2A3340] hover:border-[#3DFF9A]"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export Settings</span>
-          </button>
-
-          <label className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-[#1B232D] border border-[#2A3340] hover:border-[#3DFF9A] cursor-pointer">
-            <Upload className="w-3.5 h-3.5" />
-            <span>Import Settings</span>
             <input
-              type="file"
-              accept=".json"
-              onChange={handleImportFile}
-              className="hidden"
+              type="checkbox"
+              checked={settings.tagLocation}
+              onChange={(e) => onChangeSettings({ ...settings, tagLocation: e.target.checked })}
+              className="accent-emerald-500 w-4 h-4"
             />
           </label>
         </div>
 
-        <button
-          onClick={onShowDisclaimer}
-          className="w-full flex items-center justify-center gap-1.5 py-2 text-[#9AA6B2] hover:text-[#D5DCE3] border-t border-[#2A3340]/60 pt-2"
-        >
-          <Info className="w-3.5 h-3.5" />
-          <span>View Safety Disclaimer & MIT License</span>
-        </button>
-      </div>
+        {/* Tactical Scan Intensity */}
+        <div className="bg-[#080D14] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
+          <div className="flex items-center gap-2 text-white font-bold pb-2 border-b border-[#1E293B]">
+            <Radio className="w-4 h-4 text-amber-400" />
+            <span>SCANNER SAMPLING FREQUENCY</span>
+          </div>
 
-      <div className="text-center text-[10px] text-[#9AA6B2]/60 pt-2">
-        Fieldwatch v1.1.17 · Passive Radio Intelligence
+          <div className="grid grid-cols-3 gap-2">
+            {(['PASSIVE', 'BALANCED', 'AGGRESSIVE'] as const).map((lvl) => (
+              <button
+                key={lvl}
+                onClick={() => onChangeSettings({ ...settings, intensity: lvl })}
+                className={`py-2 rounded-lg font-bold border transition-colors ${
+                  settings.intensity === lvl
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/60'
+                    : 'bg-[#0B0F17] text-slate-500 border-[#1E293B]'
+                }`}
+              >
+                {lvl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Data Reset */}
+        {onClearData && (
+          <div className="pt-2">
+            <button
+              onClick={onClearData}
+              className="w-full py-2.5 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800 text-rose-300 font-bold rounded-xl transition-colors"
+            >
+              PURGE LOCAL DATA & LOGS
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

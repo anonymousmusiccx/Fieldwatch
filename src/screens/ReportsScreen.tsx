@@ -1,446 +1,189 @@
 import React, { useState } from 'react';
-import { Sighting, Fleet, Sit, GpsSample } from '../types';
-import { DebriefReport } from '../domain/debriefReport';
-import { sitStore } from '../domain/sitStore';
+import { Sit, Sighting, Fleet } from '../types';
 import { SitPathCanvas } from '../components/SitPathCanvas';
 import {
   FileText,
   Download,
-  Copy,
-  Check,
-  Play,
-  Pause,
-  MapPin,
-  Sparkles,
-  GitCompare,
-  Upload,
-  Radio,
+  Share2,
+  Calendar,
   Clock,
-  ArrowRight,
+  Radio,
+  Trash2,
+  Check,
 } from 'lucide-react';
 
 interface ReportsScreenProps {
-  devices: Sighting[];
+  sits: Sit[];
+  currentSightings: Sighting[];
   fleets: Fleet[];
-  demoMode: boolean;
-  customNames: Map<string, string>;
-  activeSit: Sit | null;
-  onStartSit: (name?: string) => void;
-  onPauseSit: () => void;
-  onRenameSit: (id: string, name: string) => void;
-  onLoadLog: (text: string) => void;
-  onOpenCandidates: () => void;
-  nightMode: boolean;
+  onDeleteSit?: (id: string) => void;
+  nightMode?: boolean;
 }
 
 export const ReportsScreen: React.FC<ReportsScreenProps> = ({
-  devices,
+  sits,
+  currentSightings,
   fleets,
-  demoMode,
-  customNames,
-  activeSit,
-  onStartSit,
-  onPauseSit,
-  onRenameSit,
-  onLoadLog,
-  onOpenCandidates,
-  nightMode,
+  onDeleteSit,
+  nightMode = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'DEBRIEF' | 'SIT' | 'AI' | 'LOGS'>(
-    'DEBRIEF'
-  );
-  const [copied, setCopied] = useState(false);
-  const [selectedSit1, setSelectedSit1] = useState<string>('');
-  const [selectedSit2, setSelectedSit2] = useState<string>('');
-  const [sitDiffResult, setSitDiffResult] = useState<ReturnType<
-    typeof sitStore.compareSits
-  > | null>(null);
+  const [selectedSitId, setSelectedSitId] = useState<string | null>(sits[0]?.id || null);
 
-  const sits = sitStore.getSits();
+  const activeSit = sits.find((s) => s.id === selectedSitId) || sits[0] || null;
 
-  const handleCopyText = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const exportSitJson = (sit: Sit) => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(sit, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `SITREP_${sit.id}_${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
   };
 
-  const handleDownload = (filename: string, content: string, mime: string) => {
-    const blob = new Blob([content], { type: mime });
+  const exportTacticalText = (sit: Sit) => {
+    let report = `==========================================================\n`;
+    report += `FIELDWATCH TACTICAL DEBRIEF REPORT\n`;
+    report += `INCIDENT / SNAPSHOT ID: ${sit.id}\n`;
+    report += `TIMESTAMP: ${new Date(sit.createdAtMs).toISOString()}\n`;
+    report += `TOTAL DETECTED CONTACTS: ${sit.sightings.length}\n`;
+    report += `==========================================================\n\n`;
+
+    report += `SIGNIFICANT CONTACTS LOG:\n`;
+    sit.sightings.forEach((s, idx) => {
+      report += `[#${idx + 1}] ${s.ssid || s.name || 'UNNAMED'}\n`;
+      report += `    MAC: ${s.mac} | VENDOR: ${s.ouiVendor || 'Unknown'}\n`;
+      report += `    BAND: ${s.kind} | RSSI: ${s.rssi} dBm | DIST: ~${(s.estimatedDistanceMeters ?? 0).toFixed(1)}m\n`;
+      if (s.matchedClass) report += `    CLASS: ${s.matchedClass} (${s.matchedFleet})\n`;
+      report += `\n`;
+    });
+
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `FIELDWATCH_DEBRIEF_${sit.id}.txt`;
+    link.click();
     URL.revokeObjectURL(url);
   };
 
-  const handleCompare = () => {
-    if (selectedSit1 && selectedSit2 && selectedSit1 !== selectedSit2) {
-      const res = sitStore.compareSits(selectedSit1, selectedSit2);
-      setSitDiffResult(res);
-    }
-  };
-
-  const debriefText = DebriefReport.generateDebrief(
-    devices,
-    fleets,
-    demoMode,
-    customNames
-  );
-  const aiPromptText = DebriefReport.generateAiPrompt(
-    devices,
-    fleets,
-    demoMode
-  );
-
   return (
-    <div className="p-4 max-w-2xl mx-auto space-y-4 pb-24 text-xs font-mono">
-      {/* Top Header & Sub-navigation */}
-      <div className="flex items-center justify-between pb-3 border-b border-[#2A3340]">
-        <div>
-          <h2 className="text-sm font-bold text-[#D5DCE3]">
-            REPORTS & SITS
-          </h2>
-          <p className="text-[11px] text-[#9AA6B2]">
-            Tactical debriefs, session snapshots, and log management
+    <div className="max-w-3xl mx-auto p-3 sm:p-4 font-mono text-xs select-none">
+      <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1E293B]">
+        <div className="flex items-center gap-2">
+          <FileText className="w-5 h-5 text-sky-400" />
+          <h1 className="text-sm font-bold text-white tracking-wider">TACTICAL DEBRIEF & SITREPS</h1>
+        </div>
+      </div>
+
+      {sits.length === 0 ? (
+        <div className="p-8 text-center bg-[#080D14] border border-[#1E293B] rounded-xl text-slate-500">
+          <FileText className="w-10 h-10 mx-auto mb-2 opacity-40 text-sky-400" />
+          <p className="font-bold text-white mb-1">NO SITUATION REPORTS LOGGED YET</p>
+          <p className="text-[11px] text-slate-400">
+            Tap the "SITREP" camera icon in the top header during an active operation to capture a real-time tactical snapshot.
           </p>
         </div>
-
-        <button
-          onClick={onOpenCandidates}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-[#1B232D] border border-[#2A3340] text-[#FFB020] hover:border-[#FFB020]"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Candidates</span>
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="grid grid-cols-4 gap-1.5 p-1 bg-[#141A22] rounded-lg border border-[#2A3340]">
-        {[
-          { id: 'DEBRIEF', label: 'Debrief' },
-          { id: 'SIT', label: 'Sit Sessions' },
-          { id: 'AI', label: 'AI Export' },
-          { id: 'LOGS', label: 'Logs & Replay' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`py-2 rounded font-medium text-center text-xs transition-colors ${
-              activeTab === tab.id
-                ? nightMode
-                  ? 'bg-[#3A1212] text-[#FF5A5A]'
-                  : 'bg-[#163326] text-[#3DFF9A]'
-                : 'text-[#9AA6B2] hover:text-[#D5DCE3]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* TAB 1: DEBRIEF */}
-      {activeTab === 'DEBRIEF' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#9AA6B2]">
-              Real-time tactical summary of observed radio traffic
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleCopyText(debriefText)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#141A22] border border-[#2A3340] hover:text-white"
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Sits List Sidebar */}
+          <div className="space-y-2">
+            <span className="text-[10px] text-slate-400 font-bold uppercase">CAPTURED SITREPS:</span>
+            {sits.map((sit) => (
+              <div
+                key={sit.id}
+                onClick={() => setSelectedSitId(sit.id)}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  activeSit?.id === sit.id
+                    ? 'bg-[#132032] border-sky-500/70 text-white'
+                    : 'bg-[#080D14] border-[#1E293B] text-slate-400 hover:text-white'
+                }`}
               >
-                {copied ? (
-                  <Check className="w-3.5 h-3.5 text-[#3DFF9A]" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-              <button
-                onClick={() =>
-                  handleDownload(
-                    `fieldwatch-debrief-${Date.now()}.txt`,
-                    debriefText,
-                    'text/plain'
-                  )
-                }
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#141A22] border border-[#2A3340] hover:text-white"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Save</span>
-              </button>
-            </div>
+                <div className="font-bold text-white text-xs truncate">{sit.title}</div>
+                <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-1">
+                  <Clock className="w-3 h-3" />
+                  <span>{new Date(sit.createdAtMs).toLocaleTimeString()}</span>
+                </div>
+                <div className="text-[10px] text-sky-400 mt-1 font-semibold">
+                  {sit.sightings.length} contacts logged
+                </div>
+              </div>
+            ))}
           </div>
 
-          <pre className="p-3 bg-[#0B0F14] border border-[#2A3340] rounded-lg text-[11px] text-[#D5DCE3] leading-relaxed overflow-x-auto max-h-[60vh] select-text">
-            {debriefText}
-          </pre>
-        </div>
-      )}
-
-      {/* TAB 2: SIT SESSIONS */}
-      {activeTab === 'SIT' && (
-        <div className="space-y-4">
-          {/* Active Sit Card */}
-          <div className="p-3 bg-[#141A22] rounded-lg border border-[#2A3340] space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    activeSit
-                      ? 'bg-[#3DFF9A] animate-pulse'
-                      : 'bg-[#9AA6B2]/40'
-                  }`}
-                />
-                <span className="font-semibold text-xs text-[#D5DCE3]">
-                  {activeSit ? activeSit.name : 'No Active Sit Capture'}
-                </span>
-              </div>
-              {activeSit ? (
-                <button
-                  onClick={onPauseSit}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#FF3D5A]/20 text-[#FF7A7A] border border-[#FF3D5A]/40"
-                >
-                  <Pause className="w-3.5 h-3.5" />
-                  <span>Pause Sit</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => onStartSit()}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#3DFF9A] text-[#003820] font-bold"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Start New Sit</span>
-                </button>
-              )}
-            </div>
-
-            {activeSit && (
-              <p className="text-[11px] text-[#9AA6B2]">
-                Recording {devices.length} current radio sightings and operator path.
-              </p>
-            )}
-          </div>
-
-          {/* Sit Compare Section */}
-          {sits.length >= 2 && (
-            <div className="p-3 bg-[#141A22] rounded-lg border border-[#2A3340] space-y-3">
-              <div className="flex items-center gap-2 font-semibold text-xs text-[#D5DCE3]">
-                <GitCompare className="w-4 h-4 text-[#FFB020]" />
-                <span>Sit Comparison (Diff)</span>
-              </div>
-              <p className="text-[11px] text-[#9AA6B2]">
-                Compare an earlier sit with a later sit to see what appeared, left, or moved.
-              </p>
-
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={selectedSit1}
-                  onChange={(e) => setSelectedSit1(e.target.value)}
-                  className="bg-[#1B232D] border border-[#2A3340] rounded p-2 text-xs text-[#D5DCE3]"
-                >
-                  <option value="">Baseline Sit (Older)...</option>
-                  {sits.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({new Date(s.openedAt).toLocaleTimeString()})
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedSit2}
-                  onChange={(e) => setSelectedSit2(e.target.value)}
-                  className="bg-[#1B232D] border border-[#2A3340] rounded p-2 text-xs text-[#D5DCE3]"
-                >
-                  <option value="">Current Sit (Newer)...</option>
-                  {sits.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({new Date(s.openedAt).toLocaleTimeString()})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                disabled={!selectedSit1 || !selectedSit2 || selectedSit1 === selectedSit2}
-                onClick={handleCompare}
-                className="w-full py-1.5 rounded bg-[#1B232D] border border-[#2A3340] hover:border-[#3DFF9A] text-xs font-semibold disabled:opacity-40"
-              >
-                Run Sit Comparison
-              </button>
-
-              {sitDiffResult && (
-                <div className="pt-2 border-t border-[#2A3340] space-y-2">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="p-2 bg-[#163326] rounded border border-[#3DFF9A]/30">
-                      <div className="text-base font-bold text-[#3DFF9A]">
-                        +{sitDiffResult.appeared.length}
-                      </div>
-                      <div className="text-[10px] text-[#9AA6B2]">NEW ARRIVALS</div>
-                    </div>
-                    <div className="p-2 bg-[#3A1212] rounded border border-[#FF3D5A]/30">
-                      <div className="text-base font-bold text-[#FF3D5A]">
-                        -{sitDiffResult.departed.length}
-                      </div>
-                      <div className="text-[10px] text-[#9AA6B2]">DEPARTED</div>
-                    </div>
-                    <div className="p-2 bg-[#1B232D] rounded border border-[#2A3340]">
-                      <div className="text-base font-bold text-[#4FC3F7]">
-                        {sitDiffResult.persisted.length}
-                      </div>
-                      <div className="text-[10px] text-[#9AA6B2]">PERSISTED</div>
-                    </div>
+          {/* Sit Detail Viewer */}
+          {activeSit && (
+            <div className="md:col-span-2 bg-[#080D14] border border-[#1E293B] rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+                <div>
+                  <h2 className="text-sm font-bold text-white">{activeSit.title}</h2>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {new Date(activeSit.createdAtMs).toLocaleString()} • ID: {activeSit.id}
                   </div>
                 </div>
-              )}
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => exportTacticalText(activeSit)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-[#1E293B] hover:bg-[#334155] text-white rounded text-[11px] transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>TXT</span>
+                  </button>
+                  <button
+                    onClick={() => exportSitJson(activeSit)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded text-[11px] transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>JSON</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Operator GPS Track Canvas */}
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
+                  OPERATOR PATROL VECTOR & FIXES:
+                </span>
+                <SitPathCanvas
+                  operatorPath={activeSit.operatorPath}
+                  width={460}
+                  height={160}
+                  nightMode={nightMode}
+                />
+              </div>
+
+              {/* Sighting list snapshot */}
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
+                  LOGGED RF TARGETS ({activeSit.sightings.length}):
+                </span>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  {activeSit.sightings.map((s) => (
+                    <div
+                      key={s.key}
+                      className="p-2 bg-[#0B0F17] rounded-lg border border-[#1E293B] flex items-center justify-between text-xs"
+                    >
+                      <div className="truncate min-w-0 pr-2">
+                        <div className="font-bold text-white truncate">
+                          {s.ssid || s.name || s.mac}
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {s.mac} • {s.ouiVendor}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-bold text-emerald-400">{s.rssi} dBm</span>
+                        <div className="text-[10px] text-slate-500">
+                          ~{(s.estimatedDistanceMeters ?? 0).toFixed(1)}m
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
-
-          {/* Past Sits List */}
-          <div>
-            <div className="text-xs font-bold text-[#9AA6B2] uppercase mb-2">
-              Recorded Sits ({sits.length})
-            </div>
-            {sits.length === 0 ? (
-              <p className="text-xs text-[#9AA6B2] italic">
-                No sits recorded yet. Tap Start New Sit to snapshot the current RF landscape.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {sits.map((s) => (
-                  <div
-                    key={s.id}
-                    className="p-3 bg-[#141A22] rounded-lg border border-[#2A3340] space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-[#D5DCE3]">
-                        {s.name}
-                      </span>
-                      <span className="text-[10px] text-[#9AA6B2]">
-                        {new Date(s.openedAt).toLocaleTimeString()}
-                      </span>
-                    </div>
-
-                    <p className="text-[11px] text-[#9AA6B2]">
-                      Captured {s.devices.length} radios · {s.operatorPath.length} GPS breadcrumbs
-                    </p>
-
-                    {s.operatorPath.length > 0 && (
-                      <SitPathCanvas
-                        operatorPath={s.operatorPath}
-                        payloadTrail={[]}
-                        width={300}
-                        height={120}
-                        nightMode={nightMode}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: AI EXPORT */}
-      {activeTab === 'AI' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#9AA6B2]">
-              Structured analytical prompt for intelligence assessment
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleCopyText(aiPromptText)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#141A22] border border-[#2A3340] hover:text-white"
-              >
-                {copied ? (
-                  <Check className="w-3.5 h-3.5 text-[#3DFF9A]" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-                <span>{copied ? 'Copied' : 'Copy Prompt'}</span>
-              </button>
-            </div>
-          </div>
-
-          <pre className="p-3 bg-[#0B0F14] border border-[#2A3340] rounded-lg text-[11px] text-[#D5DCE3] leading-relaxed overflow-x-auto max-h-[60vh] select-text">
-            {aiPromptText}
-          </pre>
-        </div>
-      )}
-
-      {/* TAB 4: LOGS & REPLAY */}
-      {activeTab === 'LOGS' && (
-        <div className="space-y-4">
-          <div className="p-3 bg-[#141A22] rounded-lg border border-[#2A3340] space-y-3">
-            <div className="font-semibold text-xs text-[#D5DCE3]">
-              EXPORT LIVE LOGS
-            </div>
-            <p className="text-[11px] text-[#9AA6B2]">
-              Export the current radio observation table in standard Fieldwatch formats.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() =>
-                  handleDownload(
-                    `fieldwatch-log-${Date.now()}.csv`,
-                    DebriefReport.exportCsv(devices, demoMode),
-                    'text/csv'
-                  )
-                }
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-[#1B232D] border border-[#2A3340] hover:border-[#3DFF9A]"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export CSV</span>
-              </button>
-              <button
-                onClick={() =>
-                  handleDownload(
-                    `fieldwatch-log-${Date.now()}.jsonl`,
-                    DebriefReport.exportJsonl(devices, demoMode),
-                    'application/x-ndjson'
-                  )
-                }
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-[#1B232D] border border-[#2A3340] hover:border-[#3DFF9A]"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export JSON Lines</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="p-3 bg-[#141A22] rounded-lg border border-[#2A3340] space-y-3">
-            <div className="font-semibold text-xs text-[#D5DCE3]">
-              LOG REPLAY & IMPORT
-            </div>
-            <p className="text-[11px] text-[#9AA6B2]">
-              Load a previously captured Fieldwatch CSV or JSONL log file to replay the scenario.
-            </p>
-
-            <label className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-dashed border-[#2A3340] hover:border-[#3DFF9A] cursor-pointer text-xs font-semibold text-[#9AA6B2] hover:text-[#D5DCE3]">
-              <Upload className="w-4 h-4 text-[#3DFF9A]" />
-              <span>Choose Log File (.csv or .jsonl)</span>
-              <input
-                type="file"
-                accept=".csv,.json,.jsonl,.txt"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = (evt) => {
-                    const text = evt.target?.result as string;
-                    if (text) onLoadLog(text);
-                  };
-                  reader.readAsText(file);
-                  e.target.value = '';
-                }}
-                className="hidden"
-              />
-            </label>
-          </div>
         </div>
       )}
     </div>

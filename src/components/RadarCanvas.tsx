@@ -1,16 +1,7 @@
 import React from 'react';
-import { InteractiveRfRadar } from './InteractiveRfRadar';
-import { Sighting, Fleet } from '../types';
+import { InteractiveRfRadar, InteractiveRfRadarProps } from './InteractiveRfRadar';
 
-export interface RadarCanvasProps {
-  devices: Sighting[];
-  fleets: Fleet[];
-  selectedKey?: string | null;
-  onSelectDevice?: (device: Sighting) => void;
-  onSelectKey?: (key: string) => void;
-  nightMode?: boolean;
-  demoMode?: boolean;
-}
+export type RadarCanvasProps = InteractiveRfRadarProps;
 
 export const RadarCanvas: React.FC<RadarCanvasProps> = (props) => {
   return <InteractiveRfRadar {...props} />;

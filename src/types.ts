@@ -1,253 +1,112 @@
 export type RadioKind = 'WIFI' | 'BLE';
 
-export type ViewMode = 'BY_CLASS' | 'LIST' | 'RADAR' | 'TIMELINE' | 'HYBRID';
-export type StrengthSort = 'AVERAGE' | 'INSTANT';
-export type ListSort =
-  | 'STRENGTH'
-  | 'NEWEST'
-  | 'NEWEST_ALERT'
-  | 'FIRST_SEEN'
-  | 'ARRIVAL'
-  | 'NAME'
-  | 'SIGNATURES';
-
-export type ListLine = 'ADVERTISED_NAME' | 'NAME_AND_TYPE' | 'MAC' | 'NONE';
-
 export type SignatureClass =
-  | 'FINDER'
-  | 'BEACON'
-  | 'SIGNAGE'
-  | 'WEARABLE'
   | 'SURVEILLANCE'
-  | 'DRONE'
-  | 'HACKING'
-  | 'BODYWORN'
-  | 'LAW_ENFORCEMENT'
-  | 'VEHICLE'
-  | 'GLASSES'
-  | 'AUDIO'
-  | 'CAMERA'
-  | 'THERMOSTAT'
-  | 'LOCK'
-  | 'HEALTH'
-  | 'HOME'
-  | 'ISP'
-  | 'MESH'
-  | 'PHONE'
-  | 'OTHER';
+  | 'POLICE_EMERGENCY'
+  | 'DRONE_UAV'
+  | 'TACTICAL'
+  | 'BODY_WORN'
+  | 'VEHICLE_FLEET'
+  | 'INFRASTRUCTURE'
+  | 'CONSUMER'
+  | 'UNKNOWN';
 
 export const VISIBLE_SIGNATURE_CLASSES: SignatureClass[] = [
-  'FINDER',
-  'BEACON',
-  'SIGNAGE',
-  'WEARABLE',
   'SURVEILLANCE',
-  'DRONE',
-  'HACKING',
-  'LAW_ENFORCEMENT',
-  'VEHICLE',
-  'GLASSES',
-  'AUDIO',
-  'CAMERA',
-  'THERMOSTAT',
-  'LOCK',
-  'HEALTH',
-  'HOME',
-  'ISP',
-  'MESH',
-  'PHONE',
-  'OTHER',
+  'DRONE_UAV',
+  'POLICE_EMERGENCY',
+  'TACTICAL',
+  'BODY_WORN',
+  'VEHICLE_FLEET',
+  'INFRASTRUCTURE',
+  'CONSUMER',
+  'UNKNOWN',
 ];
 
-export const SIGNATURE_CLASS_LABELS: Record<SignatureClass, string> = {
-  FINDER: 'Finder tags',
-  BEACON: 'Retail beacons',
-  SIGNAGE: 'Signage / displays',
-  WEARABLE: 'Wearables',
-  SURVEILLANCE: 'Surveillance',
-  DRONE: 'Drones / Remote ID',
-  HACKING: 'Pentest / hacking tools',
-  BODYWORN: 'Body-worn video',
-  LAW_ENFORCEMENT: 'Public safety / police',
-  VEHICLE: 'Vehicles',
-  GLASSES: 'Smart glasses',
-  AUDIO: 'Headphones / audio',
-  CAMERA: 'Cameras',
-  THERMOSTAT: 'Thermostats',
-  LOCK: 'Access control / locks',
-  HEALTH: 'Medical / health',
-  HOME: 'Home IoT',
-  ISP: 'ISP / routers',
-  MESH: 'Mesh networking',
-  PHONE: 'Phones / PCs',
-  OTHER: 'Other equipment',
+export const SIGNATURE_CLASS_LABELS: Record<SignatureClass, { label: string; color: string; bg: string; border: string }> = {
+  SURVEILLANCE: { label: 'Surveillance / IMSI', color: '#F43F5E', bg: 'rgba(244, 63, 94, 0.15)', border: '#F43F5E' },
+  DRONE_UAV: { label: 'Drone / Remote ID', color: '#FB923C', bg: 'rgba(251, 146, 60, 0.15)', border: '#FB923C' },
+  POLICE_EMERGENCY: { label: 'Public Safety / Siren', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)', border: '#EF4444' },
+  TACTICAL: { label: 'Tactical Radio / Mesh', color: '#EAB308', bg: 'rgba(234, 179, 8, 0.15)', border: '#EAB308' },
+  BODY_WORN: { label: 'Body Worn / Wearable', color: '#A855F7', bg: 'rgba(168, 85, 247, 0.15)', border: '#A855F7' },
+  VEHICLE_FLEET: { label: 'Fleet Telemetry / OBD', color: '#38BDF8', bg: 'rgba(56, 189, 248, 0.15)', border: '#38BDF8' },
+  INFRASTRUCTURE: { label: 'Critical Infrastructure', color: '#34D399', bg: 'rgba(52, 211, 153, 0.15)', border: '#34D399' },
+  CONSUMER: { label: 'Consumer Device', color: '#94A3B8', bg: 'rgba(148, 163, 184, 0.12)', border: '#94A3B8' },
+  UNKNOWN: { label: 'Unclassified RF', color: '#64748B', bg: 'rgba(100, 116, 139, 0.1)', border: '#64748B' },
 };
 
-export type RuleKind =
-  | 'OUI'
-  | 'MAC_PREFIX'
-  | 'NAME_CONTAINS'
-  | 'NAME_GLOB'
-  | 'SERVICE_UUID'
-  | 'SERVICE_DATA'
-  | 'MANUFACTURER_ID'
-  | 'MANUFACTURER_DATA'
-  | 'RADIO_KIND'
-  | 'HIDDEN_SSID'
-  | 'VENDOR_IE_OUI';
+export type RuleKind = 'MAC_PREFIX' | 'SSID_REGEX' | 'MANUFACTURER_DATA' | 'OUI';
 
 export interface MatchRule {
-  kind: RuleKind;
-  text?: string;
-  companyId?: number;
-  dataPrefixHex?: string;
-  radio?: RadioKind | null;
-  enabled: boolean;
-}
-
-export type DecodeSource = 'manufacturerData' | 'serviceData' | 'unsupported';
-
-export interface FieldGate {
-  op: 'eq' | 'neq' | 'len';
-  offset: number;
-  length?: number;
-  valueHex: string;
-}
-
-export interface DecodeFieldDef {
   id: string;
-  label: string;
-  offset: number;
-  length?: number;
-  type: 'u8' | 'i8' | 'u16' | 'i16' | 'u32' | 'i32' | 'utf8' | 'hex' | 'bool';
-  endian?: 'le' | 'be';
-  scale?: number;
-  offsetAdd?: number;
-  modulo?: number;
-  unit?: string;
-  live?: boolean;
-  liveEmphasis?: string[];
-  enumLabels?: Record<string, string>;
-  gate?: FieldGate;
-}
-
-export interface FleetDecode {
-  source: DecodeSource;
-  serviceUuid?: string;
-  includeCompanyId?: boolean;
-  fields: DecodeFieldDef[];
+  name: string;
+  kind: RuleKind;
+  pattern: string;
+  className: SignatureClass;
+  notes?: string;
 }
 
 export interface Fleet {
   id: string;
   name: string;
+  description?: string;
   enabled: boolean;
-  matchAny: boolean;
-  colorIndex: number;
+  color?: string;
   rules: MatchRule[];
-  minPeers?: number;
-  peerWindowSec?: number;
-  notes: string;
-  attentionNote: string;
-  builtIn: boolean;
-  kind: SignatureClass;
-  decode?: FleetDecode | null;
-}
-
-export interface RssiSample {
-  at: number;
-  rssi: number;
-}
-
-export interface PresenceSpan {
-  start: number;
-  end: number | null;
 }
 
 export interface GpsSample {
-  at: number;
-  lat: number;
-  lon: number;
-  alt?: number;
-  accuracy?: number;
+  latitude: number;
+  longitude: number;
+  altitudeMeters?: number;
+  accuracyMeters?: number;
+  timestampMs: number;
 }
 
 export interface PayloadFix {
-  at: number;
   lat: number;
-  lon: number;
-  alt?: number;
-}
-
-export interface LiveDecodeChip {
-  id: string;
-  label: string;
-  emphasized: boolean;
-}
-
-export interface RadioFacts {
-  serviceData?: { uuid: string; dataHex: string }[];
-  vendorIes?: { oui: string; type: number; dataHex: string }[];
+  lng: number;
+  rssi: number;
+  timestampMs: number;
 }
 
 export interface Sighting {
-  key: string; // "WIFI:AA:BB:CC:DD:EE:FF" or "BLE:AA:BB:CC:DD:EE:FF"
-  kind: RadioKind;
+  key: string;
   mac: string;
-  name: string;
+  kind: RadioKind;
+  ssid?: string;
+  name?: string;
   rssi: number;
-  rssiMin: number;
-  rssiMax: number;
-  channel: number;
-  frequencyMhz: number;
-  vendor: string | null;
-  randomized: boolean;
-  hiddenSsid: boolean;
-  serviceUuids: string[];
-  manufacturerId: number | null;
-  manufacturerDataHex: string;
-  rawHex: string;
-  extras: string;
-  firstSeen: number;
-  lastSeen: number;
-  hitCount: number;
-  fleetIds: string[];
-  rssiHistory: RssiSample[];
-  presence: PresenceSpan[];
+  rssiHistory: number[];
+  firstSeenMs: number;
+  lastSeenMs: number;
+  matchedClass?: SignatureClass;
+  matchedFleet?: string;
+  matchedRule?: string;
+  frequencyMhz?: number;
+  channel?: number;
+  packetCount: number;
+  ouiVendor?: string;
+  estimatedDistanceMeters?: number;
+  bearingDeg?: number;
   latitude?: number;
   longitude?: number;
-  altitude?: number;
-  gpsTrail?: GpsSample[];
-  bearingDeg?: number;
-  fastPairPairing?: boolean;
-  facts?: RadioFacts;
-  liveDecode?: LiveDecodeChip[];
-  payloadLat?: number;
-  payloadLon?: number;
-  payloadAlt?: number;
-  payloadTrail?: PayloadFix[];
+}
+
+export interface WatchTarget {
+  deviceKey: string;
+  note?: string;
+  addedMs: number;
+  customName?: string;
 }
 
 export interface FilterState {
-  showWifi: boolean;
-  showBle: boolean;
-  rssiMin: number;
-  namedOnly: boolean;
-  customNamesOnly: boolean;
-  watchedOnly: boolean;
-  hideFastPairAccountKey: boolean;
-  movingWithYou: boolean;
-  arrivalsOnly: boolean;
-  nameQuery: string;
-  ouiQuery: string;
-  useClassFilter: boolean;
-  excludeClasses: boolean;
+  kinds: RadioKind[];
+  minRssi: number;
   classes: SignatureClass[];
-  useFleetFilter: boolean;
-  excludeSignatures: boolean;
-  fleetIds: string[];
-  includeSignatures: boolean;
-  includeFleetIds: string[];
+  searchQuery: string;
+  classifiedOnly: boolean;
+  watchlistOnly: boolean;
 }
 
 export interface FilterPreset {
@@ -256,27 +115,10 @@ export interface FilterPreset {
   filter: FilterState;
 }
 
-export interface WatchTarget {
-  id: string;
-  deviceKey?: string;
-  fleetId?: string;
-  label: string;
-  alert: boolean;
-  observerNotes?: string;
-}
-
-export interface Sit {
-  id: string;
-  name: string;
-  openedAt: number;
-  closedAt: number | null;
-  devices: Sighting[];
-  operatorPath: GpsSample[];
-}
-
-export type AlertVoiceWhat = 'CLASS' | 'SIGNATURE' | 'BOTH';
-export type ScanIntensity = 'SAVER' | 'BALANCED' | 'PERFORMANCE';
-export type LogFormat = 'CSV' | 'JSONL';
+export type ViewMode = 'RADAR' | 'LIST' | 'BY_CLASS' | 'SIGNAL_HEATMAP';
+export type StrengthSort = 'STRONGEST_FIRST' | 'WEAKEST_FIRST' | 'MOST_ACTIVE' | 'NEWEST_FIRST';
+export type ListSort = 'RSSI_DESC' | 'RSSI_ASC' | 'LAST_SEEN_DESC' | 'PACKET_COUNT_DESC' | 'NAME_ASC';
+export type ListLine = 'MAC' | 'NAME' | 'CLASS' | 'DISTANCE' | 'FREQ';
 
 export interface AppSettings {
   nightMode: boolean;
@@ -284,28 +126,34 @@ export interface AppSettings {
   tagLocation: boolean;
   alertBeep: boolean;
   alertVoice: boolean;
-  alertVoiceWhat: AlertVoiceWhat;
-  intensity: ScanIntensity;
+  alertVoiceWhat: 'BOTH' | 'WATCHLIST' | 'CLASSIFIED';
+  intensity: 'PASSIVE' | 'BALANCED' | 'AGGRESSIVE';
   keepScreenOn: boolean;
   viewMode: ViewMode;
   strengthSort: StrengthSort;
   listSort: ListSort;
-  averageWindowSec: number;
-  decaySec: number;
-  showRssiBar: boolean;
-  showFleetName: boolean;
-  showFrequency: boolean;
-  showSeenTimes: boolean;
-  listTitleLine: ListLine;
-  listSubtitleLine: ListLine;
-  disclaimerAccepted: boolean;
+  titleLine: ListLine;
+  subtitleLine: ListLine;
+  radarRangeMeters: number;
+  radarSweepSpeed: 'FAST' | 'NORMAL' | 'SLOW';
+  radarAudioPing: boolean;
+}
+
+export interface Sit {
+  id: string;
+  title: string;
+  createdAtMs: number;
+  sightings: Sighting[];
+  operatorPath: GpsSample[];
+  durationSec: number;
 }
 
 export interface CandidateSignature {
   id: string;
+  mac: string;
   name: string;
-  kind: SignatureClass;
-  oui: string;
-  occurrences: number;
-  suggestedRules: MatchRule[];
+  kind: RadioKind;
+  observedCount: number;
+  candidateClass: SignatureClass;
+  notes: string;
 }

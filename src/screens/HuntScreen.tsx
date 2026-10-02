@@ -1,224 +1,180 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sighting } from '../types';
-import { MacUtil } from '../domain/macUtil';
 import { audioService } from '../domain/audioService';
 import { Sparkline } from '../components/Sparkline';
 import {
-  ArrowLeft,
+  Crosshair,
   Volume2,
   VolumeX,
-  Crosshair,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   Radio,
-  Flame,
+  ArrowUp,
+  AlertTriangle,
+  ChevronDown,
 } from 'lucide-react';
 
 interface HuntScreenProps {
-  device: Sighting | null;
-  onBack: () => void;
-  huntBeep: boolean;
-  huntVibrate: boolean;
-  onToggleHuntBeep: () => void;
-  demoMode: boolean;
-  nightMode: boolean;
+  devices: Sighting[];
+  activeTarget: Sighting | null;
+  onSelectTarget: (device: Sighting) => void;
+  nightMode?: boolean;
 }
 
 export const HuntScreen: React.FC<HuntScreenProps> = ({
-  device,
-  onBack,
-  huntBeep,
-  huntVibrate,
-  onToggleHuntBeep,
-  demoMode,
-  nightMode,
+  devices,
+  activeTarget,
+  onSelectTarget,
+  nightMode = false,
 }) => {
-  const [lastRssi, setLastRssi] = useState(device?.rssi || -75);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
+  // Periodic Geiger counter ticking based on target signal strength
   useEffect(() => {
-    if (!device) return;
-    setLastRssi(device.rssi);
+    if (!activeTarget || !soundEnabled) return;
 
-    // Audio geiger tick
-    if (huntBeep) {
-      audioService.tickHuntRssi(device.rssi);
-    }
+    // Normalizing RSSI: -90 dBm -> 1.5s interval; -40 dBm -> 100ms interval
+    const clampedRssi = Math.max(-95, Math.min(-35, activeTarget.rssi));
+    const normalized = (clampedRssi - (-95)) / 60; // 0.0 to 1.0
+    const intervalMs = Math.max(80, Math.floor(1400 - normalized * 1300));
 
-    // Optional haptic vibration if supported
-    if (huntVibrate && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      if (device.rssi > -60) {
-        navigator.vibrate(40);
-      }
-    }
-  }, [device, huntBeep, huntVibrate]);
+    const id = setInterval(() => {
+      audioService.playGeigerClick(0.18 + normalized * 0.15);
+    }, intervalMs);
 
-  if (!device) {
+    return () => clearInterval(id);
+  }, [activeTarget?.rssi, activeTarget?.key, soundEnabled]);
+
+  if (!activeTarget) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <p className="text-sm text-[#9AA6B2]">No target radio selected for hunt.</p>
-        <button
-          onClick={onBack}
-          className="mt-4 px-4 py-2 bg-[#1B232D] text-white rounded font-mono text-xs"
-        >
-          Return to Live
-        </button>
+      <div className="max-w-xl mx-auto p-4 text-center font-mono">
+        <div className="p-8 bg-[#080D14] border border-[#1E293B] rounded-2xl">
+          <Crosshair className="w-12 h-12 text-amber-400 mx-auto mb-3 animate-spin-slow" />
+          <h2 className="text-base font-bold text-white mb-1">NO ACTIVE HUNT TARGET SELECTED</h2>
+          <p className="text-xs text-slate-400 mb-6">
+            Select a contact from the radar feed or picker below to initiate audio homing & proximity vectoring.
+          </p>
+
+          <div className="space-y-1.5 text-left">
+            <span className="text-[11px] text-slate-400 font-bold uppercase">Nearby Transceivers:</span>
+            {devices.map((d) => (
+              <div
+                key={d.key}
+                onClick={() => onSelectTarget(d)}
+                className="p-2.5 bg-[#0E1724] hover:bg-[#162335] rounded-xl flex items-center justify-between cursor-pointer border border-[#1E293B] hover:border-amber-500/50 transition-all text-xs"
+              >
+                <div>
+                  <div className="font-bold text-white">{d.ssid || d.name || d.mac}</div>
+                  <div className="text-[10px] text-slate-400">{d.mac} • {d.ouiVendor}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-amber-400">{d.rssi} dBm</div>
+                  <div className="text-[10px] text-slate-400">~{(d.estimatedDistanceMeters ?? 0).toFixed(1)}m</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
-  const maskedMac = MacUtil.screenMac(device.mac, demoMode);
-
-  // Proximity gauge calculations (-100 dBm to -35 dBm)
-  const clamped = Math.max(-100, Math.min(-35, device.rssi));
-  const pct = ((clamped - -100) / 65) * 100;
-
-  let proximityLabel = 'SIGNAL DETECTED · DISTANT';
-  let proximityColor = 'text-[#9AA6B2]';
-  if (device.rssi >= -50) {
-    proximityLabel = 'IMMEDIATE VICINITY · HOT';
-    proximityColor = 'text-[#FF3D5A]';
-  } else if (device.rssi >= -65) {
-    proximityLabel = 'PROXIMITY ELEVATED · WARM';
-    proximityColor = 'text-[#FFB020]';
-  } else if (device.rssi >= -80) {
-    proximityLabel = 'CLOSING DISTANCE';
-    proximityColor = 'text-[#3DFF9A]';
-  }
+  // Active target calculations
+  const distance = activeTarget.estimatedDistanceMeters ?? 0;
+  const isHot = activeTarget.rssi > -50;
+  const normalizedPower = Math.max(0, Math.min(100, ((activeTarget.rssi - (-95)) / 65) * 100));
 
   return (
-    <div className="flex flex-col h-screen max-w-lg mx-auto bg-[#0B0F14] text-white font-mono select-none overflow-hidden">
-      {/* Top Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[#2A3340] bg-[#141A22]">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 p-1 text-[#9AA6B2] hover:text-white"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="font-semibold text-xs">Exit Hunt</span>
-        </button>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-[11px] font-bold text-[#FF3D5A] tracking-wider uppercase bg-[#FF3D5A]/15 px-2.5 py-1 rounded border border-[#FF3D5A]/30 animate-pulse">
-            <Crosshair className="w-3.5 h-3.5" />
-            <span>HUNT ACTIVE</span>
+    <div className="max-w-xl mx-auto p-3 sm:p-4 font-mono select-none">
+      {/* Target Selector Dropdown */}
+      <div className="mb-3 flex items-center justify-between p-2.5 bg-[#0B0F17] border border-[#1E293B] rounded-xl text-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="p-1 rounded bg-amber-500/20 text-amber-400 shrink-0">
+            <Crosshair className="w-4 h-4" />
+          </span>
+          <div className="truncate">
+            <span className="text-[10px] text-slate-400 uppercase">HUNT TARGET:</span>
+            <div className="font-bold text-white truncate">
+              {activeTarget.ssid || activeTarget.name || activeTarget.mac}
+            </div>
           </div>
+        </div>
 
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
-            onClick={onToggleHuntBeep}
-            className={`p-2 rounded-lg border transition-colors ${
-              huntBeep
-                ? 'bg-[#163326] border-[#3DFF9A] text-[#3DFF9A]'
-                : 'bg-[#1B232D] border-[#2A3340] text-[#9AA6B2]'
+            onClick={() => setSoundEnabled((prev) => !prev)}
+            className={`p-1.5 rounded border transition-colors ${
+              soundEnabled
+                ? 'bg-amber-950/60 text-amber-400 border-amber-800'
+                : 'bg-[#141E2B] text-slate-500 border-[#1E293B]'
             }`}
-            title="Geiger Audio Clicker"
+            title={soundEnabled ? 'Mute Geiger Ticks' : 'Enable Geiger Ticks'}
           >
-            {huntBeep ? (
-              <Volume2 className="w-4 h-4" />
-            ) : (
-              <VolumeX className="w-4 h-4" />
-            )}
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Target Info */}
-      <div className="p-4 bg-[#141A22] border-b border-[#2A3340] text-center space-y-1">
-        <span className="text-[10px] text-[#9AA6B2] uppercase tracking-widest block font-sans">
-          TRACKING TARGET
-        </span>
-        <h2 className="text-lg font-bold tracking-wider text-[#D5DCE3]">
-          {maskedMac}
-        </h2>
-        {device.name && (
-          <p className="text-xs text-[#3DFF9A] font-sans font-medium">
-            "{device.name}"
-          </p>
-        )}
-        <div className="flex items-center justify-center gap-3 text-[11px] text-[#9AA6B2] pt-1">
-          <span>{device.kind === 'WIFI' ? 'Wi-Fi AP' : 'Bluetooth LE'}</span>
-          <span>·</span>
-          <span>Ch {device.channel} ({device.frequencyMhz} MHz)</span>
-          {device.vendor && (
-            <>
-              <span>·</span>
-              <span>{device.vendor}</span>
-            </>
+      {/* Main Tactical Proximity Meter */}
+      <div
+        className={`relative p-6 rounded-2xl border text-center transition-all ${
+          isHot
+            ? 'bg-[#1F090E] border-rose-500/60 shadow-[0_0_25px_rgba(244,63,94,0.2)]'
+            : 'bg-[#080D14] border-[#1E293B]'
+        }`}
+      >
+        <div className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-3 border font-mono">
+          {isHot ? (
+            <span className="text-rose-400 border-rose-500/40 bg-rose-500/10 px-2 py-0.5 rounded">
+              CRITICAL PROXIMITY / IMMEDIATE ZONE
+            </span>
+          ) : (
+            <span className="text-amber-400 border-amber-500/40 bg-amber-500/10 px-2 py-0.5 rounded">
+              HOMING SIGNAL ACQUIRED
+            </span>
           )}
+        </div>
+
+        <div className="text-5xl font-black tracking-tight text-white mb-1 tabular-nums">
+          {distance.toFixed(1)}
+          <span className="text-xl font-normal text-slate-400 ml-1">meters</span>
+        </div>
+
+        <div className="text-xl font-bold text-amber-400 mb-6 tabular-nums">
+          {activeTarget.rssi} <span className="text-xs text-slate-400">dBm</span>
+        </div>
+
+        {/* Tactical Signal Strength Arc / Level */}
+        <div className="w-full bg-[#111827] h-4 rounded-full overflow-hidden p-0.5 mb-6 border border-[#1E293B]">
+          <div
+            className="h-full rounded-full transition-all duration-200"
+            style={{
+              width: `${normalizedPower}%`,
+              backgroundColor: isHot ? '#F43F5E' : '#F59E0B',
+              boxShadow: `0 0 12px ${isHot ? '#F43F5E' : '#F59E0B'}`,
+            }}
+          />
+        </div>
+
+        {/* Signal History Sparkline */}
+        <div className="p-3 bg-[#0B0F17] rounded-xl border border-[#1E293B] flex items-center justify-between text-xs">
+          <span className="text-slate-400">SIGNAL HISTORY:</span>
+          <Sparkline
+            data={activeTarget.rssiHistory}
+            width={140}
+            height={28}
+            color={isHot ? '#F43F5E' : '#F59E0B'}
+          />
         </div>
       </div>
 
-      {/* Center Giant RSSI Meter */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
-        <div className="text-center space-y-1">
-          <div className="flex items-center justify-center gap-2">
-            <span
-              className={`text-7xl font-black font-mono tracking-tighter ${
-                device.rssi >= -55
-                  ? 'text-[#FF3D5A]'
-                  : device.rssi >= -70
-                  ? 'text-[#FFB020]'
-                  : 'text-[#3DFF9A]'
-              }`}
-            >
-              {device.rssi}
-            </span>
-            <span className="text-lg font-normal text-[#9AA6B2] self-end mb-2">
-              dBm
-            </span>
-          </div>
-
-          <div className={`text-xs font-bold tracking-widest ${proximityColor}`}>
-            {proximityLabel}
-          </div>
+      {/* Target Details Grid */}
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-mono">
+        <div className="p-3 bg-[#0B0F17] border border-[#1E293B] rounded-xl">
+          <span className="text-slate-500 text-[10px]">MAC ADDRESS</span>
+          <div className="font-bold text-white mt-0.5">{activeTarget.mac}</div>
         </div>
-
-        {/* Hot / Cold Signal Bar */}
-        <div className="w-full space-y-2 max-w-sm">
-          <div className="flex justify-between text-[10px] text-[#9AA6B2]">
-            <span>-100 dBm (COLD)</span>
-            <span>-65 dBm</span>
-            <span>-35 dBm (HOT)</span>
-          </div>
-
-          <div className="h-6 w-full rounded-lg bg-[#1B232D] border border-[#2A3340] overflow-hidden p-0.5 relative">
-            <div
-              className={`h-full rounded transition-all duration-200 ${
-                device.rssi >= -55
-                  ? 'bg-gradient-to-r from-[#FFB020] to-[#FF3D5A]'
-                  : 'bg-gradient-to-r from-[#4FC3F7] to-[#3DFF9A]'
-              }`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Geiger Audio Indicator */}
-        <div className="flex items-center gap-2 text-xs font-mono text-[#9AA6B2] bg-[#141A22] px-4 py-2 rounded-full border border-[#2A3340]">
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              huntBeep ? 'bg-[#3DFF9A] animate-ping' : 'bg-[#9AA6B2]/40'
-            }`}
-          />
-          <span>
-            {huntBeep ? 'Geiger audio clicks enabled' : 'Geiger audio muted'}
-          </span>
-        </div>
-
-        {/* Full Sparkline Real-time graph */}
-        <div className="w-full max-w-sm p-3 bg-[#141A22] rounded-xl border border-[#2A3340] space-y-2">
-          <div className="flex items-center justify-between text-[10px] text-[#9AA6B2]">
-            <span>ROLLING SIGNAL GRAPH</span>
-            <span>Min: {device.rssiMin} / Max: {device.rssiMax}</span>
-          </div>
-          <div className="flex justify-center bg-[#0B0F14] p-2 rounded">
-            <Sparkline
-              history={device.rssiHistory}
-              width={300}
-              height={44}
-              color={device.rssi >= -55 ? '#FF3D5A' : '#3DFF9A'}
-            />
-          </div>
+        <div className="p-3 bg-[#0B0F17] border border-[#1E293B] rounded-xl">
+          <span className="text-slate-500 text-[10px]">VENDOR / OUI</span>
+          <div className="font-bold text-white mt-0.5 truncate">{activeTarget.ouiVendor}</div>
         </div>
       </div>
     </div>
