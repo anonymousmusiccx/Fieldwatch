@@ -4,10 +4,9 @@ import {
   Settings,
   Volume2,
   MapPin,
-  Moon,
-  Zap,
   Radio,
   Sliders,
+  Sparkles,
 } from 'lucide-react';
 
 interface SettingsScreenProps {
@@ -31,6 +30,31 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       </div>
 
       <div className="space-y-4">
+        {/* Hardware vs Demo Mode */}
+        <div className="bg-[#080D14] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
+          <div className="flex items-center gap-2 text-white font-bold pb-2 border-b border-[#1E293B]">
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>OPERATING ENVIRONMENT</span>
+          </div>
+
+          <label className="flex items-center justify-between cursor-pointer">
+            <div>
+              <div className="font-bold text-white">Demo Mode (Simulated Emitters)</div>
+              <div className="text-[10px] text-slate-500">
+                {settings.demoMode
+                  ? 'Inject simulated emitters (DJI Drone, IMSI Catcher, AirTag) for bench testing'
+                  : 'Listening to real live native Wi-Fi & Bluetooth LE radio frames'}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.demoMode}
+              onChange={(e) => onChangeSettings({ ...settings, demoMode: e.target.checked })}
+              className="accent-purple-500 w-4 h-4"
+            />
+          </label>
+        </div>
+
         {/* Audio Alerts */}
         <div className="bg-[#080D14] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
           <div className="flex items-center gap-2 text-white font-bold pb-2 border-b border-[#1E293B]">

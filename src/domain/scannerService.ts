@@ -1,5 +1,15 @@
 import { Sighting, Fleet, RadioKind, SignatureClass } from '../types';
 import { MacUtil } from './macUtil';
+import { RfScanner, isNative, type RawRf, type StartResult } from './rfScanner';
+import type { PluginListenerHandle } from '@capacitor/core';
+
+export type ScanStatus =
+  | 'OK'
+  | 'PERMISSION_DENIED'
+  | 'LOCATION_OFF'
+  | 'BLUETOOTH_OFF'
+  | 'STOPPED'
+  | 'FALLBACK_DEMO';
 
 export const INITIAL_FLEETS: Fleet[] = [
   {
@@ -244,17 +254,56 @@ const PRESET_DEVICES: DevicePreset[] = [
 
 export class ScannerService {
   private activeDevices: Map<string, Sighting> = new Map();
-  private timer: number | null = null;
+  private demoTimer: number | null = null;
+  private expiryTimer: number | null = null;
   private listeners: Set<(devices: Sighting[]) => void> = new Set();
+  private statusListeners: Set<(status: ScanStatus) => void> = new Set();
   private fleets: Fleet[] = INITIAL_FLEETS;
 
+  private isDemoMode: boolean = false;
+  private currentStatus: ScanStatus = 'STOPPED';
+  private nativeListenerHandle: PluginListenerHandle | null = null;
+
   constructor() {
-    this.initMockSightings();
+    // If not running in a native Android environment (e.g. desktop web preview),
+    // default to demo mode so testing works seamlessly.
+    if (!isNative()) {
+      this.isDemoMode = true;
+      this.initMockSightings();
+    }
   }
 
   setFleets(fleets: Fleet[]) {
     this.fleets = fleets;
     this.reclassifyAll();
+  }
+
+  /**
+   * Switch between Real hardware scanning and Simulated Demo mode
+   */
+  async setMode(demo: boolean) {
+    await this.stop();
+    this.clear();
+    this.isDemoMode = demo;
+
+    if (this.isDemoMode || !isNative()) {
+      this.initMockSightings();
+      this.startDemo(1200);
+      this.setStatus(!isNative() && !demo ? 'FALLBACK_DEMO' : 'OK');
+    } else {
+      await this.startReal();
+    }
+  }
+
+  private setStatus(status: ScanStatus) {
+    this.currentStatus = status;
+    this.statusListeners.forEach((cb) => cb(status));
+  }
+
+  subscribeStatus(cb: (status: ScanStatus) => void): () => void {
+    this.statusListeners.add(cb);
+    cb(this.currentStatus);
+    return () => this.statusListeners.delete(cb);
   }
 
   private initMockSightings() {
@@ -296,6 +345,7 @@ export class ScannerService {
 
       this.activeDevices.set(preset.mac, sighting);
     });
+    this.notify();
   }
 
   private matchDevice(
@@ -318,6 +368,7 @@ export class ScannerService {
 
     for (const fleet of this.fleets) {
       if (!fleet || !fleet.enabled || !Array.isArray(fleet.rules)) continue;
+
       for (const rule of fleet.rules) {
         if (!rule || !rule.pattern || typeof rule.pattern !== 'string') continue;
         if (rule.kind === 'MAC_PREFIX' || rule.kind === 'OUI') {
@@ -359,18 +410,192 @@ export class ScannerService {
     this.notify();
   }
 
-  start(intervalMs = 1200) {
-    if (this.timer) return;
-    this.timer = window.setInterval(() => {
+  async start(intervalMs = 1200) {
+    if (this.isDemoMode || !isNative()) {
+      this.startDemo(intervalMs);
+    } else {
+      await this.startReal();
+    }
+  }
+
+  private startDemo(intervalMs: number) {
+    if (this.demoTimer) return;
+    this.demoTimer = window.setInterval(() => {
       this.tick();
     }, intervalMs);
   }
 
-  stop() {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
+  private async startReal() {
+    try {
+      // 1. Request Runtime Permissions
+      const perms = await RfScanner.requestPerms();
+      if (!perms.granted) {
+        this.setStatus('PERMISSION_DENIED');
+        return;
+      }
+
+      // 2. Start Scanner and check hardware flags
+      const startRes: StartResult = await RfScanner.start({ wifi: true, ble: true });
+      if (!startRes.locationEnabled) {
+        this.setStatus('LOCATION_OFF');
+      } else if (!startRes.bluetoothEnabled) {
+        this.setStatus('BLUETOOTH_OFF');
+      } else {
+        this.setStatus('OK');
+      }
+
+      // 3. Attach Event Listener for Real Devices
+      if (this.nativeListenerHandle) {
+        await this.nativeListenerHandle.remove();
+        this.nativeListenerHandle = null;
+      }
+
+      this.nativeListenerHandle = await RfScanner.addListener('devices', (payload) => {
+        if (payload && Array.isArray(payload.devices)) {
+          this.ingest(payload.devices);
+        }
+      });
+
+      // 4. Start Expiry Cleaner (every 5 seconds)
+      // Drops stale BLE devices after 30s and Wi-Fi APs after 90s
+      if (!this.expiryTimer) {
+        this.expiryTimer = window.setInterval(() => {
+          this.cleanExpiredDevices();
+        }, 5000);
+      }
+    } catch (err) {
+      console.error('Failed to start native RF scanner:', err);
+      this.setStatus('PERMISSION_DENIED');
     }
+  }
+
+  /**
+   * Process raw Wi-Fi and Bluetooth LE devices received from native radio scans
+   */
+  private ingest(devices: RawRf[]) {
+    if (!devices || devices.length === 0) return;
+    const now = Date.now();
+
+    for (const raw of devices) {
+      if (!raw.mac) continue;
+      const cleanMac = raw.mac.toUpperCase();
+      const existing = this.activeDevices.get(cleanMac);
+
+      const proximity = MacUtil.estimateProximity(raw.rssi, raw.kind);
+
+      if (existing) {
+        // Update existing device observation
+        existing.rssi = raw.rssi;
+        existing.rssiHistory.push(raw.rssi);
+        if (existing.rssiHistory.length > 20) {
+          existing.rssiHistory.shift();
+        }
+        existing.lastSeenMs = now;
+        existing.packetCount += 1;
+        existing.estimatedDistanceMeters = proximity.meters;
+        if (raw.ssid && !existing.ssid) existing.ssid = raw.ssid;
+        if (raw.name && (!existing.name || existing.name === 'Wi-Fi AP')) existing.name = raw.name;
+        if (raw.frequency && !existing.frequencyMhz) {
+          existing.frequencyMhz = raw.frequency;
+          existing.channel = this.frequencyToChannel(raw.frequency);
+        }
+      } else {
+        // New sighting observed
+        const label = raw.ssid || raw.name || '';
+        const { matchedClass, matchedFleet, matchedRule } = this.matchDevice(cleanMac, label);
+        const channel = raw.frequency ? this.frequencyToChannel(raw.frequency) : undefined;
+        const bearing = this.calculatePseudoBearing(cleanMac);
+
+        const sighting: Sighting = {
+          key: cleanMac,
+          mac: cleanMac,
+          kind: raw.kind,
+          name: raw.name,
+          ssid: raw.ssid,
+          rssi: raw.rssi,
+          rssiHistory: [raw.rssi],
+          firstSeenMs: now,
+          lastSeenMs: now,
+          matchedClass,
+          matchedFleet,
+          matchedRule,
+          frequencyMhz: raw.frequency,
+          channel,
+          packetCount: 1,
+          ouiVendor: MacUtil.getVendor(cleanMac),
+          estimatedDistanceMeters: proximity.meters,
+          bearingDeg: bearing,
+        };
+
+        this.activeDevices.set(cleanMac, sighting);
+      }
+    }
+
+    this.notify();
+  }
+
+  private cleanExpiredDevices() {
+    const now = Date.now();
+    let changed = false;
+
+    this.activeDevices.forEach((dev, mac) => {
+      // 30 seconds for BLE, 90 seconds for Wi-Fi (due to Android scan throttling)
+      const timeoutMs = dev.kind === 'BLE' ? 30000 : 90000;
+      if (now - dev.lastSeenMs > timeoutMs) {
+        this.activeDevices.delete(mac);
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      this.notify();
+    }
+  }
+
+  private calculatePseudoBearing(mac: string): number {
+    let hash = 0;
+    for (let i = 0; i < mac.length; i++) {
+      hash = (hash << 5) - hash + mac.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash) % 360;
+  }
+
+  private frequencyToChannel(freq: number): number | undefined {
+    if (freq >= 2412 && freq <= 2484) {
+      if (freq === 2484) return 14;
+      return Math.round((freq - 2407) / 5);
+    }
+    if (freq >= 5170 && freq <= 5825) {
+      return Math.round((freq - 5000) / 5);
+    }
+    return undefined;
+  }
+
+  async stop() {
+    if (this.demoTimer) {
+      clearInterval(this.demoTimer);
+      this.demoTimer = null;
+    }
+
+    if (this.expiryTimer) {
+      clearInterval(this.expiryTimer);
+      this.expiryTimer = null;
+    }
+
+    if (this.nativeListenerHandle) {
+      await this.nativeListenerHandle.remove();
+      this.nativeListenerHandle = null;
+    }
+
+    if (isNative()) {
+      try {
+        await RfScanner.stop();
+      } catch (ignored) {
+      }
+    }
+
+    this.setStatus('STOPPED');
   }
 
   subscribe(cb: (devices: Sighting[]) => void): () => void {
@@ -391,7 +616,6 @@ export class ScannerService {
   private tick() {
     const now = Date.now();
 
-    // Randomly update 2-4 devices with new RSSI and packet count
     this.activeDevices.forEach((dev) => {
       if (Math.random() > 0.4) {
         const delta = Math.floor((Math.random() - 0.48) * 6);
@@ -410,7 +634,6 @@ export class ScannerService {
         const proximity = MacUtil.estimateProximity(newRssi, dev.kind);
         dev.estimatedDistanceMeters = proximity.meters;
 
-        // Slight drift in bearing
         if (dev.bearingDeg !== undefined) {
           dev.bearingDeg = (dev.bearingDeg + (Math.random() - 0.5) * 4 + 360) % 360;
         }

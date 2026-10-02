@@ -13,9 +13,10 @@ import {
   ListLine,
   MatchRule,
 } from './types';
-import { scannerService, INITIAL_FLEETS } from './domain/scannerService';
+import { scannerService, INITIAL_FLEETS, type ScanStatus } from './domain/scannerService';
 import { audioService } from './domain/audioService';
 import { GpsService } from './domain/gpsService';
+import { isNative } from './domain/rfScanner';
 import { Header } from './components/Header';
 import { BottomNav, AppRoute } from './components/BottomNav';
 import { DisclaimerModal } from './components/DisclaimerModal';
@@ -27,6 +28,7 @@ import { FleetsScreen } from './screens/FleetsScreen';
 import { ReportsScreen } from './screens/ReportsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { DeviceDetailScreen } from './screens/DeviceDetailScreen';
+import { AlertTriangle, MapPinOff, BluetoothOff, ShieldAlert, Info } from 'lucide-react';
 
 const DEFAULT_SETTINGS: AppSettings = {
   nightMode: false,
@@ -69,6 +71,7 @@ export const App: React.FC = () => {
 
   // Data Stores
   const [devices, setDevices] = useState<Sighting[]>([]);
+  const [scanStatus, setScanStatus] = useState<ScanStatus>('OK');
   const [fleets, setFleets] = useState<Fleet[]>(() => {
     try {
       const saved = localStorage.getItem('fieldwatch_fleets');
@@ -111,7 +114,7 @@ export const App: React.FC = () => {
   });
   const [filterState, setFilterState] = useState<FilterState>(DEFAULT_FILTER);
 
-  // GPS Simulation / Tracking
+  // GPS Tracking
   const [operatorPath, setOperatorPath] = useState<GpsSample[]>(() =>
     GpsService.generateMockTrack(37.7749, -122.4194, 8)
   );
@@ -134,9 +137,17 @@ export const App: React.FC = () => {
     localStorage.setItem('fieldwatch_settings', JSON.stringify(settings));
   }, [settings]);
 
-  // Connect scanner service
+  // Scanner status subscription
   useEffect(() => {
-    scannerService.start(settings.intensity === 'AGGRESSIVE' ? 800 : settings.intensity === 'PASSIVE' ? 2000 : 1200);
+    const unsub = scannerService.subscribeStatus((status) => {
+      setScanStatus(status);
+    });
+    return unsub;
+  }, []);
+
+  // Connect scanner service mode
+  useEffect(() => {
+    scannerService.setMode(settings.demoMode);
     const unsubscribe = scannerService.subscribe((devs) => {
       setDevices(devs);
     });
@@ -145,7 +156,32 @@ export const App: React.FC = () => {
       unsubscribe();
       scannerService.stop();
     };
-  }, [settings.intensity]);
+  }, [settings.demoMode, settings.intensity]);
+
+  // Real Operator GPS Tracking
+  useEffect(() => {
+    if (!settings.tagLocation) return;
+
+    if ('geolocation' in navigator) {
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const sample: GpsSample = {
+            timestampMs: Date.now(),
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracyMeters: pos.coords.accuracy || 10,
+          };
+          setOperatorPath((prev) => [...prev.slice(-120), sample]);
+        },
+        (err) => {
+          console.warn('Geolocation unavailable:', err.message);
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+      );
+
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, [settings.tagLocation]);
 
   // Alert on priority threats
   const watchlistKeys = useMemo(
@@ -153,7 +189,6 @@ export const App: React.FC = () => {
     [watchlist]
   );
 
-  // Keep track of previously alerted devices to avoid repetition
   const alertedDevicesRef = React.useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -185,23 +220,17 @@ export const App: React.FC = () => {
   // Filter devices
   const filteredDevices = useMemo(() => {
     return devices.filter((dev) => {
-      // Kind
       if (!filterState.kinds.includes(dev.kind)) return false;
-      // RSSI Cutoff
       if (dev.rssi < filterState.minRssi) return false;
-      // Match Class
       if (filterState.classes.length > 0) {
         if (!dev.matchedClass || !filterState.classes.includes(dev.matchedClass)) return false;
       }
-      // Classified only
       if (filterState.classifiedOnly && (!dev.matchedClass || dev.matchedClass === 'UNKNOWN')) {
         return false;
       }
-      // Watchlist only
       if (filterState.watchlistOnly && !watchlistKeys.has(dev.key)) {
         return false;
       }
-      // Search text
       if (filterState.searchQuery.trim()) {
         const q = filterState.searchQuery.toLowerCase();
         const matchesMac = (dev.mac || '').toLowerCase().includes(q);
@@ -279,7 +308,6 @@ export const App: React.FC = () => {
     );
   };
 
-  // Accept Disclaimer
   const handleAcceptDisclaimer = () => {
     localStorage.setItem('fieldwatch_disclaimer_accepted', 'true');
     setHasAcceptedTerms(true);
@@ -301,6 +329,47 @@ export const App: React.FC = () => {
         threatCount={threatCount}
         onSnapshotSit={handleSnapshotSit}
       />
+
+      {/* Hardware Warning Banners */}
+      {!settings.demoMode && scanStatus !== 'OK' && (
+        <div className="w-full max-w-2xl mx-auto px-3 pt-2">
+          {scanStatus === 'PERMISSION_DENIED' && (
+            <div className="flex items-center gap-2.5 p-2.5 bg-rose-950/80 border border-rose-500/70 rounded-lg text-rose-200 text-xs font-mono">
+              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>
+                <strong>Permissions Required:</strong> Location & Nearby Devices permissions are required to scan live Wi-Fi and Bluetooth emitters.
+              </span>
+            </div>
+          )}
+
+          {scanStatus === 'LOCATION_OFF' && (
+            <div className="flex items-center gap-2.5 p-2.5 bg-amber-950/80 border border-amber-500/70 rounded-lg text-amber-200 text-xs font-mono">
+              <MapPinOff className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Location Service Off:</strong> Android requires system Location to be turned ON to return nearby Wi-Fi APs.
+              </span>
+            </div>
+          )}
+
+          {scanStatus === 'BLUETOOTH_OFF' && (
+            <div className="flex items-center gap-2.5 p-2.5 bg-sky-950/80 border border-sky-500/70 rounded-lg text-sky-200 text-xs font-mono">
+              <BluetoothOff className="w-4 h-4 text-sky-400 shrink-0" />
+              <span>
+                <strong>Bluetooth Disabled:</strong> Turn on Bluetooth on your device to intercept BLE tags and beacons.
+              </span>
+            </div>
+          )}
+
+          {scanStatus === 'FALLBACK_DEMO' && (
+            <div className="flex items-center gap-2.5 p-2.5 bg-purple-950/80 border border-purple-500/70 rounded-lg text-purple-200 text-xs font-mono">
+              <Info className="w-4 h-4 text-purple-400 shrink-0" />
+              <span>
+                <strong>Browser Preview:</strong> Native radio hardware is only available on Android. Displaying simulated RF signals.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Route Content */}
       <main className="w-full">
