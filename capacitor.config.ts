@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'app.fieldwatch',
   appName: 'Fieldwatch',
   webDir: 'dist',
-  bundledWebRuntime: false,
   server: {
     androidScheme: 'https',
   },
